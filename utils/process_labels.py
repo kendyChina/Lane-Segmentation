@@ -55,7 +55,7 @@ def encode_labels(color_mask):
 
     return encode_mask
 
-"""decode the labels's trainId to id"""
+"""Decode the labels's trainId to id"""
 def decode_labels(labels):
     deocde_mask = np.zeros((labels.size[0], labels.size[1]), dtype='uint8')
     # 0
@@ -77,7 +77,7 @@ def decode_labels(labels):
 
     return deocde_mask
 
-"""decode the labels's trainId to color"""
+"""Decode the labels's trainId to color"""
 def decode_color_labels(labels):
     decode_mask = np.zeros((3, labels.size[0], labels.size[1]), dtype='uint8')
     # 0

@@ -1,5 +1,6 @@
 from PIL import Image
 
+"""Crop and resize the data or label"""
 def crop_resize_data(image, label=None, image_size=[1024, 384], offset=690):
     (width, height) = image.size
     (left, upper, right, lower) = (0, offset, width, height)
