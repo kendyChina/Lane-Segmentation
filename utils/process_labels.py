@@ -2,80 +2,27 @@ import numpy as np
 
 """Encode the color_mask's id to trainId"""
 def encode_labels(color_mask):
-    encode_mask = np.zeros((color_mask.size[0], color_mask.size[1]), dtype=np.int64) # size as color_mask
+    encode_mask = np.zeros((color_mask.size[0], color_mask.size[1]),
+                           dtype=np.int64) # size as color_mask
     # If ignoreInEval=True, then value=0
-    # 0
-    encode_mask[color_mask == 0] = 0
-    encode_mask[color_mask == 249] = 0
-    encode_mask[color_mask == 255] = 0
-    # 1
-    encode_mask[color_mask == 200] = 1
-    encode_mask[color_mask == 204] = 1
-    encode_mask[color_mask == 213] = 0
-    encode_mask[color_mask == 209] = 1
-    encode_mask[color_mask == 206] = 0
-    encode_mask[color_mask == 207] = 0
-    # 2
-    encode_mask[color_mask == 201] = 2
-    encode_mask[color_mask == 203] = 2
-    encode_mask[color_mask == 211] = 0
-    encode_mask[color_mask == 208] = 0
-    # 3
-    encode_mask[color_mask == 216] = 0
-    encode_mask[color_mask == 217] = 3
-    encode_mask[color_mask == 215] = 0
-    # 4
-    encode_mask[color_mask == 218] = 0
-    encode_mask[color_mask == 219] = 0
-    # all labels in train 4 will be pass
-    # so this is 4 actually
-    encode_mask[color_mask == 210] = 4
-    encode_mask[color_mask == 232] = 0
-    # 5
-    encode_mask[color_mask == 214] = 5
-    # 6
-    encode_mask[color_mask == 202] = 0
-    encode_mask[color_mask == 220] = 6
-    encode_mask[color_mask == 221] = 6
-    encode_mask[color_mask == 222] = 6
-    encode_mask[color_mask == 231] = 0
-    encode_mask[color_mask == 224] = 6
-    encode_mask[color_mask == 225] = 6
-    encode_mask[color_mask == 226] = 6
-    encode_mask[color_mask == 230] = 0
-    encode_mask[color_mask == 228] = 0
-    encode_mask[color_mask == 229] = 0
-    encode_mask[color_mask == 233] = 0
-    # 7
-    encode_mask[color_mask == 205] = 7
-    encode_mask[color_mask == 212] = 0
-    encode_mask[color_mask == 227] = 7
-    encode_mask[color_mask == 223] = 0
-    encode_mask[color_mask == 250] = 7
+    train_id = {0: [0, 249, 255, 213, 206, 207, 211, 208, 216, 215, 218,
+                    219, 232, 202, 231, 230, 228, 229, 233, 212, 223],
+                1: [200, 204, 209], 2: [201, 203], 3: [217], 4: [210],
+                5: [214], 6: [220, 221, 222, 224, 225, 226], 7: [205, 227, 250]}
+    for i in range(len(train_id)):
+        for item in train_id[i]:
+            encode_mask[color_mask == item] = i
 
     return encode_mask
 
 """Decode the labels's trainId to id"""
 def decode_labels(labels):
-    deocde_mask = np.zeros((labels.size[0], labels.size[1]), dtype='uint8')
-    # 0
-    deocde_mask[labels == 0] = 0
-    # 1
-    deocde_mask[labels == 1] = 204
-    # 2
-    deocde_mask[labels == 2] = 203
-    # 3
-    deocde_mask[labels == 3] = 217
-    # 4
-    deocde_mask[labels == 4] = 210
-    # 5
-    deocde_mask[labels == 5] = 214
-    # 6
-    deocde_mask[labels == 6] = 224
-    # 7
-    deocde_mask[labels == 7] = 227
+    decode_mask = np.zeros((labels.size[0], labels.size[1]), dtype='uint8')
+    id = {0: 0, 1: 204, 2: 203, 3: 217, 4: 210, 5: 214, 6: 224, 7: 227}
+    for i in range(len(id)):
+        decode_mask[labels == i] = id[i]
 
-    return deocde_mask
+    return decode_mask
 
 """Decode the labels's trainId to color"""
 def decode_color_labels(labels):
