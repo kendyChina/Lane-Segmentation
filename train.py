@@ -1,19 +1,17 @@
 import numpy as np
+import time
 import torch
-import torch.nn as nn
-import pandas as pd
 from utils.data_feeder import dataprocess, cuda_avail
+from utils.loss.focal_loss import FocalLoss
+from utils.loss.dice_loss import DC_and_CE_loss
 from models.UNet import UNet
 from models.ResNet import resnet18
 
 if cuda_avail:
-    torch.cuda.set_device(6)
+    torch.cuda.set_device(2)
 
 # MIoU: Mean Intersection over Union
 class MeanIoU(object):
-    def __init__(self, num_classes=8):
-        self.num_classes = num_classes
-        # self.confusionMatrix = np.zeros((self.num_classes, ) * 2)
     def getConfusionMatrix(self):
         # print(pred)
         # print(label)
@@ -48,9 +46,13 @@ class MeanIoU(object):
         return mIoU
 
     def __call__(self, pred, label):
-        print(pred.shape)
-        print(label.shape)
-        # assert pred.shape[-2:] == label.shape[-2:]
+        self.num_classes = pred.shape[1]
+        pred = pred.cpu()
+        label = label.cpu()
+        pred = torch.argmax(pred, dim=1)
+        # print(pred.shape)
+        # print(label.shape)
+        assert pred.shape[-2:] == label.shape[-2:]
         self.pred = pred
         self.label = label
         self.getConfusionMatrix()
@@ -58,28 +60,55 @@ class MeanIoU(object):
 
 class Loss(object):
     def __call__(self, pred ,label):
-        pred = torch.from_numpy(pred.astype(np.float32))
-        label = torch.from_numpy(label.astype(np.float32))
-        ce_loss = nn.CrossEntropyLoss()
-        res_ce_loss = ce_loss(pred, label)
-        print(res_ce_loss)
+        # pred = torch.from_numpy(pred.astype(np.float32))
+        # label = torch.from_numpy(label.astype(np.float32))
+        # ce_loss = nn.CrossEntropyLoss()
+        # focal_loss = FocalLoss()
+        # res_ce_loss = focal_loss(pred, label)
+        dc_ce_loss = DC_and_CE_loss({}, {})
+        res_dc_ce_loss = dc_ce_loss(pred, label)
+        return res_dc_ce_loss
+
+class Network(object):
+    def __init__(self, is_train=True):
+        self.is_train = is_train
+    def __call__(self, image, label, network="UNet"):
+        if "UNet" in network:
+            model = UNet()
+        elif "Resnet" in network:
+            model = resnet18()
+
+        if self.is_train:
+            model.train()
+        else:
+            model.eval()
+        if cuda_avail:
+            model.cuda()
+        pred = model(image)
+
+        create_miou = MeanIoU()
+        miou = create_miou(pred, label)
+        create_loss = Loss()
+        loss = create_loss(pred, label)
+        return loss, miou, pred, model
 
 def main():
-    num_classes = 8
-    miou = MeanIoU(num_classes)
-    loss = Loss()
-    model = UNet()
-    if cuda_avail:
-        model.cuda()
-    model.eval()
-    for batch_item in dataprocess:
-        image, label = batch_item["image"], batch_item["label"]
-        if cuda_avail:
-            image, label = image.cuda(), label.cuda()
-        pred = model(image)
-        res_miou = miou(pred, label)
-        print(res_miou)
-
+    epochs = 2
+    iter_id = 0
+    for epoch in range(epochs):
+        for batch_item in dataprocess:
+            time_1 = time.time()
+            iter_id += 1
+            image, label = batch_item["image"], batch_item["label"]
+            if cuda_avail:
+                image, label = image.cuda(), label.cuda()
+            run_network = Network(is_train=True)
+            loss, miou, pred, model = run_network(image, label, network="UNet")
+            optimizer = torch.optim.Adam(model.parameters())
+            optimizer.step()
+            time_2 = time.time()
+            print("Iter - {}: train loss: {:.6f}, mean iou: {:.6f}, "
+                  "cost time: {:.6f}".format(iter_id, loss, miou, time_2 - time_1))
 
 
 if __name__ == '__main__':

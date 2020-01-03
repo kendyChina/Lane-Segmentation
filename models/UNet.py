@@ -80,26 +80,26 @@ class UNet(nn.Module):
         self.last = nn.Conv2d(in_chnl, n_classes, kernel_size=1)
 
     def forward(self, x):
-        print(x.shape)
+        # print(x.shape)
         bridges = []
         for i, down in enumerate(self.down_path):
             x = down(x)
-            print("down")
-            print(x.shape)
+            # print("down")
+            # print(x.shape)
             if i != self.depth - 1:
                 bridges.append(x)
                 x = F.max_pool2d(x, kernel_size=2, stride=2)
-                print("maxpooling")
-                print(x.shape)
+                # print("maxpooling")
+                # print(x.shape)
 
         for i, up in enumerate(self.up_path):
             x = up(x, bridges[-1 - i])
-            print("up")
-            print(x.shape)
+            # print("up")
+            # print(x.shape)
 
         x = self.last(x)
-        print("last")
-        print(x.shape)
+        # print("last")
+        # print(x.shape)
 
         return x
 
