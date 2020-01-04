@@ -28,8 +28,6 @@ class UNetConvBlock(nn.Module):
 class UNetUpBlock(nn.Module):
     def __init__(self, in_chnl, out_chnl, up_mode, padding, batch_norm):
         super(UNetUpBlock, self).__init__()
-        # in_chnl = int(in_chnl)
-        # out_chnl = int(out_chnl)
         if up_mode == "upconv":
             self.up = nn.ConvTranspose2d(in_chnl, out_chnl, kernel_size=2, stride=2)
         elif up_mode == "upsample":
@@ -84,22 +82,14 @@ class UNet(nn.Module):
         bridges = []
         for i, down in enumerate(self.down_path):
             x = down(x)
-            # print("down")
-            # print(x.shape)
             if i != self.depth - 1:
                 bridges.append(x)
                 x = F.max_pool2d(x, kernel_size=2, stride=2)
-                # print("maxpooling")
-                # print(x.shape)
 
         for i, up in enumerate(self.up_path):
             x = up(x, bridges[-1 - i])
-            # print("up")
-            # print(x.shape)
 
         x = self.last(x)
-        # print("last")
-        # print(x.shape)
 
         return x
 

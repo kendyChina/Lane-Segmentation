@@ -1,14 +1,12 @@
 import numpy as np
 import time
 import torch
-from utils.data_feeder import dataprocess, cuda_avail
+import torch.nn as nn
+from utils.data_feeder import train_loader, val_loader, cuda_avail
 from utils.loss.focal_loss import FocalLoss
 from utils.loss.dice_loss import DC_and_CE_loss
 from models.UNet import UNet
 from models.ResNet import resnet18
-
-if cuda_avail:
-    torch.cuda.set_device(2)
 
 # MIoU: Mean Intersection over Union
 class MeanIoU(object):
@@ -86,29 +84,68 @@ class Network(object):
             model.cuda()
         pred = model(image)
 
-        create_miou = MeanIoU()
-        miou = create_miou(pred, label)
-        create_loss = Loss()
-        loss = create_loss(pred, label)
-        return loss, miou, pred, model
+        calc_miou = MeanIoU()
+        miou = calc_miou(pred, label)
+        calc_loss = Loss()
+        loss = calc_loss(pred, label)
+        return loss, miou, pred
+
+def weights_init(m):
+    if isinstance(m, (nn.Conv2d, nn.Linear)):
+        nn.init.xavier_normal_(m.weight)
+        nn.init.constant_(m.bias, 0.0)
 
 def main():
     epochs = 2
     iter_id = 0
+    network = "UNet"
+    is_train = True
+    batch_size = 2
+
+    if "UNet" in network:
+        model = UNet()
+    elif "Resnet" in network:
+        model = resnet18()
+
+    if cuda_avail:
+        torch.cuda.set_device(4)
+        model.cuda()
+
+    model.apply(weights_init)
+
+    optimizer = torch.optim.Adam(model.parameters())
+    calc_miou = MeanIoU()
+    calc_loss = Loss()
+
+    train_len = len(train_loader)
+    val_len = len(val_loader)
+    total_iter = train_len // batch_size
     for epoch in range(epochs):
-        for batch_item in dataprocess:
+        for batch_item in train_loader:
             time_1 = time.time()
+            model.train()
+            optimizer.zero_grad()
             iter_id += 1
             image, label = batch_item["image"], batch_item["label"]
             if cuda_avail:
                 image, label = image.cuda(), label.cuda()
-            run_network = Network(is_train=True)
-            loss, miou, pred, model = run_network(image, label, network="UNet")
-            optimizer = torch.optim.Adam(model.parameters())
+            pred = model(image)
+            miou = calc_miou(pred, label)
+            train_loss = calc_loss(pred, label)
+            train_loss.backward()
             optimizer.step()
             time_2 = time.time()
-            print("Iter - {}: train loss: {:.6f}, mean iou: {:.6f}, "
-                  "cost time: {:.6f}".format(iter_id, loss, miou, time_2 - time_1))
+            train_time = time_2 - time_1
+
+            # model.eval()
+            # pred = model(image)
+
+            # print_msg = (f'[{iter_id}/{total_iter}] ' +
+            #              f'train_loss: {train_loss:.5f} ' +
+            #              f'valid_loss: {valid_loss:.5f}')
+            # print(print_msg)
+            print("Iter[{}/{}]: train loss: {:.6f}, mean iou: {:.6f}, "
+                  "cost time: {:.6f}".format(iter_id, total_iter, train_loss, miou, time_2 - time_1))
 
 
 if __name__ == '__main__':
