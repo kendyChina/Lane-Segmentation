@@ -9,10 +9,10 @@ def remote_path():
     """
     sample:
     image: /root/data/LaneSeg/Image_Data/Road02/Record001/Camera 5/170927_064620420_Camera_6.jpg
-    label: /root/data/LaneSeg/Gray_Label/Label_road02/Label/Record001/Camera 5/170927_064620420_Camera_6_bin.png
+    label: /root/data/LaneSeg/label_fixed/Label_road02/Label/Record001/Camera 5170927_064620420_Camera_6_bin.png
     """
     image_dir = "/root/data/LaneSeg/Image_Data"
-    label_dir = "/root/data/LaneSeg/Gray_Label"
+    label_dir = "/root/data/LaneSeg/label_fixed"
     for s1 in os.listdir(image_dir):
         image_sub_dir1 = os.path.join(image_dir, s1) # Road2
         label_sub_dir1 = os.path.join(label_dir, "Label_{}".format(s1.lower()), "Label") # Label_road2/Label

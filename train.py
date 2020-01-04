@@ -2,11 +2,13 @@ import numpy as np
 import time
 import torch
 import torch.nn as nn
-from utils.data_feeder import train_loader, val_loader, cuda_avail
+from utils.data_feeder import train_loader, val_loader
+from utils.loss.focal_loss import FocalLoss
 from utils.loss.focal_loss import FocalLoss
 from utils.loss.dice_loss import DC_and_CE_loss
 from models.UNet import UNet
 from models.ResNet import resnet18
+from config import CONFIG
 
 # MIoU: Mean Intersection over Union
 class MeanIoU(object):
@@ -44,7 +46,7 @@ class MeanIoU(object):
         return mIoU
 
     def __call__(self, pred, label):
-        self.num_classes = pred.shape[1]
+        self.num_classes = CONFIG.NUM_CLASSES
         pred = pred.cpu()
         label = label.cpu()
         pred = torch.argmax(pred, dim=1)
@@ -63,32 +65,10 @@ class Loss(object):
         # ce_loss = nn.CrossEntropyLoss()
         # focal_loss = FocalLoss()
         # res_ce_loss = focal_loss(pred, label)
-        dc_ce_loss = DC_and_CE_loss({}, {})
-        res_dc_ce_loss = dc_ce_loss(pred, label)
-        return res_dc_ce_loss
-
-class Network(object):
-    def __init__(self, is_train=True):
-        self.is_train = is_train
-    def __call__(self, image, label, network="UNet"):
-        if "UNet" in network:
-            model = UNet()
-        elif "Resnet" in network:
-            model = resnet18()
-
-        if self.is_train:
-            model.train()
-        else:
-            model.eval()
-        if cuda_avail:
-            model.cuda()
-        pred = model(image)
-
-        calc_miou = MeanIoU()
-        miou = calc_miou(pred, label)
-        calc_loss = Loss()
-        loss = calc_loss(pred, label)
-        return loss, miou, pred
+        # dc_ce_loss = DC_and_CE_loss({}, {})
+        # res_dc_ce_loss = dc_ce_loss(pred, label)
+        res = nn.CrossEntropyLoss()(pred, label)
+        return res
 
 def weights_init(m):
     if isinstance(m, (nn.Conv2d, nn.Linear)):
@@ -96,19 +76,18 @@ def weights_init(m):
         nn.init.constant_(m.bias, 0.0)
 
 def main():
-    epochs = 2
     iter_id = 0
     network = "UNet"
-    is_train = True
-    batch_size = 2
 
     if "UNet" in network:
         model = UNet()
     elif "Resnet" in network:
         model = resnet18()
+    else:
+        raise ValueError("Network is not support")
 
-    if cuda_avail:
-        torch.cuda.set_device(4)
+    if CONFIG.CUDA_AVAIL:
+        torch.cuda.set_device(CONFIG.SET_DEVICE)
         model.cuda()
 
     model.apply(weights_init)
@@ -119,23 +98,30 @@ def main():
 
     train_len = len(train_loader)
     val_len = len(val_loader)
-    total_iter = train_len // batch_size
-    for epoch in range(epochs):
+    total_iter = train_len // CONFIG.BATCH_SIZE
+    for epoch in range(CONFIG.EPOCHS):
+        prev_loss = 0.0
+        total_loss = 0.0
+        model.train()
+        train_loader.set_description_str("epoch: {}".format(epoch))
+        time_1 = time.time()
         for batch_item in train_loader:
-            time_1 = time.time()
-            model.train()
             optimizer.zero_grad()
             iter_id += 1
             image, label = batch_item["image"], batch_item["label"]
-            if cuda_avail:
+            if CONFIG.CUDA_AVAIL:
                 image, label = image.cuda(), label.cuda()
             pred = model(image)
             miou = calc_miou(pred, label)
-            train_loss = calc_loss(pred, label)
-            train_loss.backward()
+            this_loss = calc_loss(pred, label)
+            this_loss.backward()
             optimizer.step()
-            time_2 = time.time()
-            train_time = time_2 - time_1
+            train_loader.set_postfix_str("train_loss: {:.4f}".format(this_loss.item()))
+            total_loss += this_loss.item()
+        time_2 = time.time()
+        train_time = time_2 - time_1
+        train_epoch_str = "Epoch: {}, train_loss is {:.4f}".format(epoch, total_loss / train_len)
+        print(train_epoch_str)
 
             # model.eval()
             # pred = model(image)
@@ -144,8 +130,8 @@ def main():
             #              f'train_loss: {train_loss:.5f} ' +
             #              f'valid_loss: {valid_loss:.5f}')
             # print(print_msg)
-            print("Iter[{}/{}]: train loss: {:.6f}, mean iou: {:.6f}, "
-                  "cost time: {:.6f}".format(iter_id, total_iter, train_loss, miou, time_2 - time_1))
+            # print("Iter[{}/{}]: train loss: {:.20f}, mean iou: {:.6f}, "
+            #       "cost time: {:.6f}".format(iter_id, total_iter, this_loss, miou, time_2 - time_1))
 
 
 if __name__ == '__main__':

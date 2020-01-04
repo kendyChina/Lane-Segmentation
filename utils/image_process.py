@@ -76,15 +76,15 @@ class DeformAug(object):
 class ToTensor(object):
     def __call__(self, sample):
         image, label = sample
-        # Transpose (H, W, C) to (C, W, H)
-        image = image.transpose((2, 1, 0))
+        # Transpose (H, W, C) to (C, H, W)
+        image = image.transpose((2, 0, 1))
+        label = label.transpose((1, 0))
         image = image.astype(np.float32)
-        label = label.astype(np.int8)
+        label = label.astype(np.long)
         return {"image": torch.from_numpy(image.copy()),
                 "label": torch.from_numpy(label.copy())}
 
 if __name__ == '__main__':
     # img = Image.open(r"E:\code\cv\baidu_data_set\baidu_Image_Data\Road02\ColorImage_road02\ColorImage\Record001\Camera 5\170927_063811892_Camera_5.jpg")
     # crop_resize_data(img, img)
-    lanedataset = LaneDataset(r"../data_list/val.csv")
-    lanedataset[0]
+    pass
