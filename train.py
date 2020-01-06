@@ -1,7 +1,9 @@
 import numpy as np
-import time
+import os, shutil, time
+from tqdm import tqdm
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from utils.data_feeder import train_loader, val_loader
 from utils.loss.focal_loss import FocalLoss
 from utils.loss.focal_loss import FocalLoss
@@ -49,7 +51,7 @@ class MeanIoU(object):
         self.num_classes = CONFIG.NUM_CLASSES
         pred = pred.cpu()
         label = label.cpu()
-        pred = torch.argmax(pred, dim=1)
+        pred = torch.argmax(F.softmax(pred, dim=1), dim=1)
         # print(pred.shape)
         # print(label.shape)
         assert pred.shape[-2:] == label.shape[-2:]
@@ -57,6 +59,22 @@ class MeanIoU(object):
         self.label = label
         self.getConfusionMatrix()
         return self.meanIntersectionOverUnion()
+
+def compute_miou(pred, label, result):
+    """
+        pred : [N, H, W]
+        label: [N, H, W]
+        """
+    pred = pred.cpu().numpy()
+    label = label.cpu().numpy()
+    for i in range(CONFIG.NUM_CLASSES7):
+        single_label = label == i
+        single_pred = pred == i
+        temp_tp = np.sum(single_label * single_pred)
+        temp_ta = np.sum(single_pred) + np.sum(single_label) - temp_tp
+        result["TP"][i] += temp_tp
+        result["TA"][i] += temp_ta
+    return result
 
 class Loss(object):
     def __call__(self, pred ,label):
@@ -67,7 +85,7 @@ class Loss(object):
         # res_ce_loss = focal_loss(pred, label)
         # dc_ce_loss = DC_and_CE_loss({}, {})
         # res_dc_ce_loss = dc_ce_loss(pred, label)
-        res = nn.CrossEntropyLoss()(pred, label)
+        res = nn.CrossEntropyLoss(reduction="mean")(pred, label)
         return res
 
 def weights_init(m):
@@ -75,8 +93,78 @@ def weights_init(m):
         nn.init.xavier_normal_(m.weight)
         nn.init.constant_(m.bias, 0.0)
 
+class Main(object):
+    def __init__(self, network="UNet", reflash_log=False):
+        if "UNet" in network:
+            self.model = UNet()
+        elif "Resnet" in network:
+            self.model = resnet18()
+        else:
+            raise ValueError("Network is not support")
+        if CONFIG.CUDA_AVAIL:
+            torch.cuda.set_device(CONFIG.SET_DEVICE)
+            self.model.cuda()
+        self.model.apply(weights_init)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=CONFIG.BASE_LR, weight_decay=CONFIG.WEIGHT_DECAY)
+        self.calc_loss = nn.CrossEntropyLoss()
+
+        self.reflash_log = reflash_log
+
+
+    def train_epoch(self):
+        self.model.train()
+        total_mask_loss = 0.0
+        dataprocess = tqdm(train_loader)
+        dataprocess.set_description_str("epoch:{}".format(self.epoch))
+        for batch_item in dataprocess:
+            image, label = batch_item["image"], batch_item["label"]
+            if CONFIG.CUDA_AVAIL:
+                image.cuda(), label.cuda()
+            self.optimizer.zero_grad()
+            pred = self.model(image)
+            mask_loss = self.calc_loss(pred, label)
+            total_mask_loss += mask_loss.item()
+            mask_loss.backward()
+            self.optimizer.step()
+            dataprocess.set_postfix_str("mask_loss:{:.4f}".format(mask_loss.item()))
+        self.trainF.write("Epoch:{}, mask loss is {:.4f} \n".format(self.epoch, total_mask_loss / len(train_loader)))
+        self.trainF.flush()
+
+
+    def test(self):
+        self.model.eval()
+        total_mask_loss = 0.0
+        dataprocess = tqdm(val_loader)
+        dataprocess.set_description_str("epoch:{}".format(self.epoch))
+        result = {"TP": {i: 0 for i in range(CONFIG.NUM_CLASSES)},
+                  "TA": {i: 0 for i in range(CONFIG.NUM_CLASSES)}}
+        for batch_item in dataprocess:
+            image, label = batch_item["image"], batch_item["label"]
+            if CONFIG.CUDA_AVAIL:
+                image.cuda(), label.cuda()
+            pred = self.model(image)
+            mask_loss = self.calc_loss(pred, label)
+            total_mask_loss += mask_loss.detach().item()
+            pred
+
+
+    def run(self):
+        if os.path.exists(CONFIG.SAVE_PATH):
+            if self.reflash_log:
+                shutil.rmtree(CONFIG.SAVE_PATH)
+        os.makedirs(CONFIG.SAVE_PATH, exist_ok=True)
+        self.trainF = open(os.path.join(CONFIG.SAVE_PATH, "train.csv"), mode="w")
+        self.testF = open(os.path.join(CONFIG.SAVE_PATH, "test.csv"), mode="w")
+        for epoch in CONFIG.EPOCHS:
+            self.epoch = epoch
+            self.train_epoch()
+            self.test()
+        self.trainF.close()
+        self.testF.close()
+
+
+
 def main():
-    iter_id = 0
     network = "UNet"
 
     if "UNet" in network:
@@ -97,11 +185,10 @@ def main():
     calc_loss = Loss()
 
     train_len = len(train_loader)
-    val_len = len(val_loader)
-    total_iter = train_len // CONFIG.BATCH_SIZE
     for epoch in range(CONFIG.EPOCHS):
         prev_loss = 0.0
         total_loss = 0.0
+        iter_id = 0
         model.train()
         train_loader.set_description_str("epoch: {}".format(epoch))
         time_1 = time.time()
@@ -116,11 +203,12 @@ def main():
             this_loss = calc_loss(pred, label)
             this_loss.backward()
             optimizer.step()
-            train_loader.set_postfix_str("train_loss: {:.4f}".format(this_loss.item()))
             total_loss += this_loss.item()
+            train_loader.set_postfix_str("train_loss: {:.4f}".format(total_loss / iter_id))
+            # print("avg_loss: {:.10f}, miou: {:.10f}".format(total_loss / iter_id, miou))
         time_2 = time.time()
         train_time = time_2 - time_1
-        train_epoch_str = "Epoch: {}, train_loss is {:.4f}".format(epoch, total_loss / train_len)
+        train_epoch_str = "Epoch: {}, train_loss is {:.4f}, miou is {:.4f}".format(epoch, total_loss / train_len, )
         print(train_epoch_str)
 
             # model.eval()

@@ -3,8 +3,9 @@ import numpy as np
 """Encode the color_mask's id to trainId"""
 def encode_labels(color_mask):
     encode_mask = np.zeros((color_mask.size[0], color_mask.size[1]),
-                           dtype=np.int64) # size as color_mask
+                           dtype=np.long) # size as color_mask
     # If ignoreInEval=True, then value=0
+    color_mask = np.array(color_mask).T # Image(W, H) -> array(H, W) -> array(W, H)
     train_id = {0: [0, 249, 255, 213, 206, 207, 211, 208, 216, 215, 218,
                     219, 232, 202, 231, 230, 228, 229, 233, 212, 223],
                 1: [200, 204, 209], 2: [201, 203], 3: [217], 4: [210],

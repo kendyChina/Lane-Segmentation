@@ -9,10 +9,10 @@ def remote_path():
     """
     sample:
     image: /root/data/LaneSeg/Image_Data/Road02/Record001/Camera 5/170927_064620420_Camera_6.jpg
-    label: /root/data/LaneSeg/label_fixed/Label_road02/Label/Record001/Camera 5170927_064620420_Camera_6_bin.png
+    label: /root/data/LaneSeg/Gray_Label/Label_road02/Label/Record001/Camera 5170927_064620420_Camera_6_bin.png
     """
     image_dir = "/root/data/LaneSeg/Image_Data"
-    label_dir = "/root/data/LaneSeg/label_fixed"
+    label_dir = "/root/data/LaneSeg/Gray_Label"
     for s1 in os.listdir(image_dir):
         image_sub_dir1 = os.path.join(image_dir, s1) # Road2
         label_sub_dir1 = os.path.join(label_dir, "Label_{}".format(s1.lower()), "Label") # Label_road2/Label
@@ -42,7 +42,8 @@ def local_path():
     label: E:\code\cv\baidu_data_set\baidu_Gray_Label\Label_road02\Label\Record007\Camera 6\170927_064620420_Camera_6_bin.png
     """
     image_dir = r"E:\code\cv\baidu_data_set\baidu_Image_Data"
-    label_dir = r"E:\code\cv\baidu_data_set\baidu_Labels_Fixed"
+    label_dir = r"E:\code\cv\baidu_data_set\baidu_Gray_Label"
+    # label_dir = r"E:\code\cv\baidu_data_set\baidu_Labels_Fixed"
     for s1 in os.listdir(image_dir):
         image_sub_dir1 = os.path.join(image_dir, s1)
         label_sub_dir1 = os.path.join(label_dir, "Label_{}".format(s1.lower()))
@@ -71,6 +72,7 @@ def local_path():
 
 def run():
     remote_path()
+    # local_path()
     assert len(image_list) == len(label_list)
     len_total = len(image_list)
     print("Image_list's length: {}, label_list's length: {}".format(len_total, len_total))

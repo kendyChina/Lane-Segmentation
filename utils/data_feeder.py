@@ -1,4 +1,3 @@
-from tqdm import tqdm
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
@@ -25,10 +24,8 @@ test_dataset = LaneDataset(test_dir)
 # drop_last: drop the last data in each epoches
 train_loader = DataLoader(train_dataset, batch_size=CONFIG.BATCH_SIZE,
                                  shuffle=True, drop_last=True, **kwargs)
-train_loader = tqdm(train_loader)
-print(len(train_loader))
+
 val_loader = DataLoader(val_dir, batch_size=1,
                         shuffle=False, drop_last=False, **kwargs)
-val_loader = tqdm(val_loader)
 
 

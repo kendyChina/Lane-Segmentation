@@ -10,9 +10,10 @@ class CONFIG(object):
         CUDA_AVAIL = torch.cuda.is_available()
     else:
         CUDA_AVAIL = False
-    SET_DEVICE = 3
+    SAVE_PATH = "logs"
+    SET_DEVICE = 2
     EPOCHS = 200
-    BATCH_SIZE = 2
+    BATCH_SIZE = 4
     # IMG_SIZE = [1024, 384]
     IMG_SIZE = [256, 96]
     OFFSET = 690

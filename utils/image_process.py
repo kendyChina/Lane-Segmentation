@@ -25,7 +25,6 @@ class LaneDataset(Dataset):
     def __init__(self, csv_file, image_size=[1024, 384], offset=690, transform=None):
         super(LaneDataset, self).__init__()
         data = pd.read_csv(csv_file)
-        # values is to change pandas.Series to numpy.ndarray
         self.image = data["image"].values
         self.label = data["label"].values
         assert self.image.shape[0] == self.label.shape[0]
@@ -42,8 +41,9 @@ class LaneDataset(Dataset):
         ori_label = Image.open(self.label[idx])
         ori_image, ori_label = crop_resize_data(ori_image, ori_label,
                                                 self.image_size, self.offset)
-        # Image -> ndarray
+        # Image -> ndarray (W, H)
         ori_image = np.array(ori_image)
+        # ori_image = ori_image
         ori_label = encode_labels(ori_label)
 
         sample = [ori_image.copy(), ori_label.copy()]
@@ -78,11 +78,12 @@ class ToTensor(object):
         image, label = sample
         # Transpose (H, W, C) to (C, H, W)
         image = image.transpose((2, 0, 1))
+        # Transpose (W, H) to (H, W)
         label = label.transpose((1, 0))
         image = image.astype(np.float32)
         label = label.astype(np.long)
         return {"image": torch.from_numpy(image.copy()),
-                "label": torch.from_numpy(label.copy())}
+                "label": torch.from_numpy(label.copy()).long()}
 
 if __name__ == '__main__':
     # img = Image.open(r"E:\code\cv\baidu_data_set\baidu_Image_Data\Road02\ColorImage_road02\ColorImage\Record001\Camera 5\170927_063811892_Camera_5.jpg")
