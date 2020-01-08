@@ -12,6 +12,9 @@ from models.UNet import UNet
 from models.ResNet import resnet18
 from config import CONFIG
 
+def now():
+    return time.strftime("%Y-%m-%d %H:%M:%S ", time.localtime())
+
 # MIoU: Mean Intersection over Union
 class MeanIoU(object):
     def getConfusionMatrix(self):
@@ -60,21 +63,21 @@ class MeanIoU(object):
         self.getConfusionMatrix()
         return self.meanIntersectionOverUnion()
 
-def compute_miou(pred, label, result):
+def compute_iou(pred, label, miou):
     """
-        pred : [N, H, W]
-        label: [N, H, W]
-        """
+    pred : [N, H, W]
+    label: [N, H, W]
+    """
     pred = pred.cpu().numpy()
     label = label.cpu().numpy()
-    for i in range(CONFIG.NUM_CLASSES7):
+    for i in range(CONFIG.NUM_CLASSES):
         single_label = label == i
         single_pred = pred == i
         temp_tp = np.sum(single_label * single_pred)
         temp_ta = np.sum(single_pred) + np.sum(single_label) - temp_tp
-        result["TP"][i] += temp_tp
-        result["TA"][i] += temp_ta
-    return result
+        miou["TP"][i] += temp_tp
+        miou["TA"][i] += temp_ta
+    return miou
 
 class Loss(object):
     def __call__(self, pred ,label):
@@ -103,7 +106,7 @@ class Main(object):
             raise ValueError("Network is not support")
         if CONFIG.CUDA_AVAIL:
             torch.cuda.set_device(CONFIG.SET_DEVICE)
-            self.model.cuda()
+            self.model = self.model.cuda()
         self.model.apply(weights_init)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=CONFIG.BASE_LR, weight_decay=CONFIG.WEIGHT_DECAY)
         self.calc_loss = nn.CrossEntropyLoss()
@@ -116,17 +119,17 @@ class Main(object):
         total_mask_loss = 0.0
         dataprocess = tqdm(train_loader)
         dataprocess.set_description_str("epoch:{}".format(self.epoch))
-        for batch_item in dataprocess:
+        for batch_idx, batch_item in enumerate(dataprocess):
             image, label = batch_item["image"], batch_item["label"]
             if CONFIG.CUDA_AVAIL:
-                image.cuda(), label.cuda()
+                image, label = image.cuda(), label.cuda()
             self.optimizer.zero_grad()
             pred = self.model(image)
             mask_loss = self.calc_loss(pred, label)
             total_mask_loss += mask_loss.item()
             mask_loss.backward()
             self.optimizer.step()
-            dataprocess.set_postfix_str("mask_loss:{:.4f}".format(mask_loss.item()))
+            dataprocess.set_postfix_str("mask_loss:{:.4f}".format(total_mask_loss/ (batch_idx + 1)))
         self.trainF.write("Epoch:{}, mask loss is {:.4f} \n".format(self.epoch, total_mask_loss / len(train_loader)))
         self.trainF.flush()
 
@@ -136,16 +139,31 @@ class Main(object):
         total_mask_loss = 0.0
         dataprocess = tqdm(val_loader)
         dataprocess.set_description_str("epoch:{}".format(self.epoch))
-        result = {"TP": {i: 0 for i in range(CONFIG.NUM_CLASSES)},
-                  "TA": {i: 0 for i in range(CONFIG.NUM_CLASSES)}}
+        iou = {"TP": {i: 0 for i in range(CONFIG.NUM_CLASSES)},
+               "TA": {i: 0 for i in range(CONFIG.NUM_CLASSES)}}
         for batch_item in dataprocess:
             image, label = batch_item["image"], batch_item["label"]
             if CONFIG.CUDA_AVAIL:
-                image.cuda(), label.cuda()
+                image, label = image.cuda(), label.cuda()
             pred = self.model(image)
             mask_loss = self.calc_loss(pred, label)
             total_mask_loss += mask_loss.detach().item()
-            pred
+            pred = torch.argmax(F.softmax(pred, dim=1), dim=1)
+            iou = compute_iou(pred, label, iou)
+            dataprocess.set_postfix_str("mask_loss:{:.4f}".format(mask_loss))
+        self.testF.write("Epoch:{} \n".format(self.epoch))
+        total_iou = 0.0
+        for i in range(CONFIG.NUM_CLASSES):
+            iou_i = iou["TP"][i] / iou["TA"][i]
+            iou_string = "Class{}'s iou: {:.4f} \n".format(i, iou_i)
+            total_iou += iou_i
+            print(iou_string)
+            self.testF.write(iou_string)
+        miou_string = "MIoU is: {:.4f}".format(total_iou / CONFIG.NUM_CLASSES)
+        print(miou_string)
+        self.testF.write(miou_string)
+        self.testF.write("Epoch:{}, mask loss is {:.4f} \n".format(self.epoch, total_mask_loss / len(val_loader)))
+        self.testF.flush()
 
 
     def run(self):
@@ -155,78 +173,20 @@ class Main(object):
         os.makedirs(CONFIG.SAVE_PATH, exist_ok=True)
         self.trainF = open(os.path.join(CONFIG.SAVE_PATH, "train.csv"), mode="w")
         self.testF = open(os.path.join(CONFIG.SAVE_PATH, "test.csv"), mode="w")
-        for epoch in CONFIG.EPOCHS:
+        for epoch in range(1, CONFIG.EPOCHS + 1):
             self.epoch = epoch
-            self.train_epoch()
+            # self.train_epoch()
             self.test()
+            if epoch % CONFIG.SAVE_EPOCH:
+                torch.save({'state_dict': self.model.state_dict()},
+                           os.path.join(os.getcwd(), CONFIG.SAVE_PATH, "laneModel{}.pth.tar".format(epoch)))
         self.trainF.close()
         self.testF.close()
+        torch.save({'state_dict': self.model.state_dict()},
+                   os.path.join(os.getcwd(), CONFIG.SAVE_PATH, "finalModel.pth.tar"))
 
-
-
-def main():
-    network = "UNet"
-
-    if "UNet" in network:
-        model = UNet()
-    elif "Resnet" in network:
-        model = resnet18()
-    else:
-        raise ValueError("Network is not support")
-
-    if CONFIG.CUDA_AVAIL:
-        torch.cuda.set_device(CONFIG.SET_DEVICE)
-        model.cuda()
-
-    model.apply(weights_init)
-
-    optimizer = torch.optim.Adam(model.parameters())
-    calc_miou = MeanIoU()
-    calc_loss = Loss()
-
-    train_len = len(train_loader)
-    for epoch in range(CONFIG.EPOCHS):
-        prev_loss = 0.0
-        total_loss = 0.0
-        iter_id = 0
-        model.train()
-        train_loader.set_description_str("epoch: {}".format(epoch))
-        time_1 = time.time()
-        for batch_item in train_loader:
-            optimizer.zero_grad()
-            iter_id += 1
-            image, label = batch_item["image"], batch_item["label"]
-            if CONFIG.CUDA_AVAIL:
-                image, label = image.cuda(), label.cuda()
-            pred = model(image)
-            miou = calc_miou(pred, label)
-            this_loss = calc_loss(pred, label)
-            this_loss.backward()
-            optimizer.step()
-            total_loss += this_loss.item()
-            train_loader.set_postfix_str("train_loss: {:.4f}".format(total_loss / iter_id))
-            # print("avg_loss: {:.10f}, miou: {:.10f}".format(total_loss / iter_id, miou))
-        time_2 = time.time()
-        train_time = time_2 - time_1
-        train_epoch_str = "Epoch: {}, train_loss is {:.4f}, miou is {:.4f}".format(epoch, total_loss / train_len, )
-        print(train_epoch_str)
-
-            # model.eval()
-            # pred = model(image)
-
-            # print_msg = (f'[{iter_id}/{total_iter}] ' +
-            #              f'train_loss: {train_loss:.5f} ' +
-            #              f'valid_loss: {valid_loss:.5f}')
-            # print(print_msg)
-            # print("Iter[{}/{}]: train loss: {:.20f}, mean iou: {:.6f}, "
-            #       "cost time: {:.6f}".format(iter_id, total_iter, this_loss, miou, time_2 - time_1))
 
 
 if __name__ == '__main__':
-    # miou = MeanIoU()
-    # pred = np.array([[-1, 0, 1], [3, 4, 10]])
-    # label = np.array([[-1, 1, 1], [3, 4, 10]])
-    # miou(pred, label)
-    # loss = Loss()
-    # loss(pred, label)
-    main()
+    main = Main()
+    main.run()

@@ -4,9 +4,9 @@ from torch.utils.data import DataLoader
 from utils.image_process import LaneDataset, ImageAug, DeformAug, ToTensor
 from config import CONFIG
 
-print("cuda is available: {}".format(CONFIG.CUDA_AVAIL))
+print("CUDA's availability: {}".format(CONFIG.CUDA_AVAIL))
 # pin_memory: 锁页内存
-kwargs = {"num_workers": 1, "pin_memory": False} if CONFIG.CUDA_AVAIL else {}
+kwargs = {"num_workers": 1, "pin_memory": True} if CONFIG.CUDA_AVAIL else {}
 train_dir = r"data_list/train.csv"
 val_dir = r"data_list/val.csv"
 test_dir = r"data_list/test.csv"
@@ -25,7 +25,7 @@ test_dataset = LaneDataset(test_dir)
 train_loader = DataLoader(train_dataset, batch_size=CONFIG.BATCH_SIZE,
                                  shuffle=True, drop_last=True, **kwargs)
 
-val_loader = DataLoader(val_dir, batch_size=1,
+val_loader = DataLoader(val_dataset, batch_size=CONFIG.BATCH_SIZE,
                         shuffle=False, drop_last=False, **kwargs)
 
 
