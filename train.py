@@ -8,9 +8,11 @@ from utils.data_feeder import train_loader, val_loader
 from utils.loss.focal_loss import FocalLoss
 from utils.loss.focal_loss import FocalLoss
 from utils.loss.dice_loss import DC_and_CE_loss
+from utils.earlystop import PaW, EarlyStopping
 from models.UNet import UNet
-from models.ResNet import resnet18
 from config import CONFIG
+
+checkpoint_file = "checkpoint.pt"
 
 def now():
     return time.strftime("%Y-%m-%d %H:%M:%S ", time.localtime())
@@ -79,80 +81,16 @@ def compute_iou(pred, label, miou):
         miou["TA"][i] += temp_ta
     return miou
 
-class Loss(object):
-    def __call__(self, pred ,label):
-        # pred = torch.from_numpy(pred.astype(np.float32))
-        # label = torch.from_numpy(label.astype(np.float32))
-        # ce_loss = nn.CrossEntropyLoss()
-        # focal_loss = FocalLoss()
-        # res_ce_loss = focal_loss(pred, label)
-        # dc_ce_loss = DC_and_CE_loss({}, {})
-        # res_dc_ce_loss = dc_ce_loss(pred, label)
-        res = nn.CrossEntropyLoss(reduction="mean")(pred, label)
-        return res
 
 def weights_init(m):
     if isinstance(m, (nn.Conv2d, nn.Linear)):
         nn.init.xavier_normal_(m.weight)
         nn.init.constant_(m.bias, 0.0)
 
-def print_and_write(file, string):
-    print(string)
-    file.write(string + "\n")
-    file.flush()
-
-class EarlyStopping:
-    """Early stops the training if validation loss doesn't improve after a given patience."""
-    def __init__(self, file, patience=7, verbose=True, delta=0):
-        """
-        Args:
-            patience (int): How long to wait after last time validation loss improved.
-                            Default: 7
-            verbose (bool): If True, prints a message for each validation loss improvement.
-                            Default: True
-            delta (float): Minimum change in the monitored quantity to qualify as an improvement.
-                            Default: 0
-        """
-        self.file = file
-        self.patience = patience
-        self.verbose = verbose
-        self.counter = 0
-        self.best_score = None
-        self.early_stop = False
-        self.val_loss_min = np.Inf
-        self.delta = delta
-
-    def __call__(self, val_loss, model, epoch):
-
-        score = -val_loss
-
-        if self.best_score is None:
-            self.best_score = score
-            self.save_checkpoint(val_loss, model, epoch)
-        elif score < self.best_score + self.delta:
-            self.counter += 1
-            print_and_write(self.file, f'EarlyStopping counter: {self.counter} out of {self.patience}')
-            if self.counter >= self.patience:
-                self.early_stop = True
-        else:
-            self.best_score = score
-            self.save_checkpoint(val_loss, model, epoch)
-            self.counter = 0
-
-    def save_checkpoint(self, val_loss, model, epoch):
-        '''Saves model when validation loss decrease.'''
-        if self.verbose:
-            print_and_write(self.file,
-                            f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-        torch.save(model.state_dict(), os.path.join(CONFIG.SAVE_PATH, 'checkpoint{}.pt'.format(epoch)))
-        self.val_loss_min = val_loss
-
 class Main(object):
     def __init__(self, network="UNet"):
         if "UNet" in network:
             self.model = UNet()
-        elif "Resnet" in network:
-            self.model = resnet18()
         else:
             raise ValueError("Network is not support")
         if CONFIG.CUDA_AVAIL:
@@ -163,6 +101,7 @@ class Main(object):
         self.calc_loss = nn.CrossEntropyLoss()
         self.trainingF = open(os.path.join(CONFIG.SAVE_PATH, "training.csv"), mode="a")
         self.earlystop = EarlyStopping(self.trainingF, verbose=True)
+        self.print_and_write = PaW(self.trainingF)
 
 
     def train_epoch(self):
@@ -181,7 +120,7 @@ class Main(object):
             mask_loss.backward()
             self.optimizer.step()
             dataprocess.set_postfix_str("mask_loss:{:.4f}".format(total_mask_loss/ (batch_idx + 1)))
-        print_and_write(self.trainingF, "mask loss is {:.4f}".format(total_mask_loss / len(train_loader)))
+        self.print_and_write("mask loss is {:.4f}".format(total_mask_loss / len(train_loader)))
         self.trainingF.flush()
 
 
@@ -206,42 +145,36 @@ class Main(object):
         total_iou = 0.0
         for i in range(1, CONFIG.NUM_CLASSES): # ignore class 0
             iou_i = iou["TP"][i] / iou["TA"][i]
-            iou_string = "Class{}'s iou: {:.4f} \n".format(i, iou_i)
+            iou_string = "Class{}'s iou: {:.4f}".format(i, iou_i)
             total_iou += iou_i
             print(iou_string)
             self.trainingF.write(iou_string)
-        print_and_write(self.trainingF, "MIoU is: {:.4f}".format(total_iou / CONFIG.NUM_CLASSES))
+        self.print_and_write("MIoU is: {:.4f}".format(total_iou / CONFIG.NUM_CLASSES))
 
         avg_loss = total_mask_loss / len(val_loader)
-        print_and_write(self.trainingF, "mask loss is {:.4f}".format(avg_loss))
+        self.print_and_write("mask loss is {:.4f}".format(avg_loss))
 
-        self.earlystop(avg_loss, self.model, self.epoch)
+        self.earlystop(avg_loss, self.model)
         self.trainingF.flush()
 
 
     def run(self):
-        if os.path.exists(CONFIG.SAVE_PATH):
-            self.model.apply(weights_init) # init
+        checkpoint_path = os.path.join(CONFIG.SAVE_PATH, checkpoint_file)
+        if os.path.exists(checkpoint_path):
+            self.model.load_state_dict(torch.load(checkpoint_path))
+            self.print_and_write("load checkpoint succeed")
         else:
-            self.model.load_state_dict(torch.load(os.path.join(CONFIG.SAVE_PATH, "checkpoint1.pt")))
-        os.makedirs(CONFIG.SAVE_PATH, exist_ok=True)
-        # self.valF = open(os.path.join(CONFIG.SAVE_PATH, "valid.csv"), mode="a")
+            self.model.apply(weights_init)  # init
+            self.print_and_write("init weights succeed")
         for epoch in range(1, CONFIG.EPOCHS + 1):
-            print_and_write(self.trainingF, "********** EPOCH {} **********".format(epoch))
+            self.print_and_write("********** EPOCH {} **********".format(epoch))
             self.epoch = epoch
             self.train_epoch()
             self.valid_epoch()
             if self.earlystop.early_stop:
-                print_and_write("Early stopping")
+                self.print_and_write("Early stopping")
                 break
-            # if epoch % CONFIG.SAVE_EPOCH:
-            #     torch.save({'state_dict': self.model.state_dict()},
-            #                os.path.join(os.getcwd(), CONFIG.SAVE_PATH, "laneModel{}.pth.tar".format(epoch)))
         self.trainingF.close()
-        # self.testF.close()
-        # torch.save({'state_dict': self.model.state_dict()},
-        #            os.path.join(os.getcwd(), CONFIG.SAVE_PATH, "finalModel.pth.tar"))
-
 
 
 if __name__ == '__main__':

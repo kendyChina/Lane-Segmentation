@@ -8,8 +8,8 @@ label_list = []
 def remote_path():
     """
     sample:
-    image: /root/data/LaneSeg/Image_Data/Road02/Record001/Camera 5/170927_064620420_Camera_6.jpg
-    label: /root/data/LaneSeg/Gray_Label/Label_road02/Label/Record001/Camera 5170927_064620420_Camera_6_bin.png
+        image: /root/data/LaneSeg/Image_Data/Road02/Record001/Camera 5/170927_064620420_Camera_6.jpg
+        label: /root/data/LaneSeg/Gray_Label/Label_road02/Label/Record001/Camera 5170927_064620420_Camera_6_bin.png
     """
     image_dir = "/root/data/LaneSeg/Image_Data"
     label_dir = "/root/data/LaneSeg/Gray_Label"
@@ -38,8 +38,8 @@ def remote_path():
 def local_path():
     """
     sample:
-    image: E:\code\cv\baidu_data_set\baidu_Image_Data\Road02\ColorImage_road02\ColorImage\Record007\Camera 6\170927_064620420_Camera_6.jpg
-    label: E:\code\cv\baidu_data_set\baidu_Gray_Label\Label_road02\Label\Record007\Camera 6\170927_064620420_Camera_6_bin.png
+        image: E:\code\cv\baidu_data_set\baidu_Image_Data\Road02\ColorImage_road02\ColorImage\Record007\Camera 6\170927_064620420_Camera_6.jpg
+        label: E:\code\cv\baidu_data_set\baidu_Gray_Label\Label_road02\Label\Record007\Camera 6\170927_064620420_Camera_6_bin.png
     """
     image_dir = r"E:\code\cv\baidu_data_set\baidu_Image_Data"
     label_dir = r"E:\code\cv\baidu_data_set\baidu_Gray_Label"
