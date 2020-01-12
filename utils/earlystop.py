@@ -46,6 +46,8 @@ class EarlyStopping:
         elif score < self.best_score + self.delta:
             self.counter += 1
             self.print_and_write(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+            self.print_and_write("Saving model ...")
+            torch.save(model.state_dict(), os.path.join(CONFIG.SAVE_PATH, 'checkpoint.pt'))
             if self.counter >= self.patience:
                 self.early_stop = True
         else:

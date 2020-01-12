@@ -1,10 +1,13 @@
 import torch
 
 class CONFIG(object):
-    # model config
+    """
+        to config the network
+    """
+    """network config"""
     NUM_CLASSES = 8
 
-    # device config
+    """device config"""
     USE_CUDA = True
     if USE_CUDA:
         CUDA_AVAIL = torch.cuda.is_available()
@@ -14,7 +17,7 @@ class CONFIG(object):
 
     SAVE_PATH = "logs"
 
-    # train config
+    """train config"""
     EPOCHS = 200
     BATCH_SIZE = 2
     # IMG_SIZE = [1024, 384]
@@ -23,3 +26,10 @@ class CONFIG(object):
     OFFSET = 690
     WEIGHT_DECAY = 1.0e-4
     BASE_LR = 6.0e-4
+
+    """deeplabv3p config"""
+    OUTPUT_STRIDE = 8
+    # OUTPUT_STRIDE = 16
+    ASPP_OUTDIM = 256
+    SHORTCUT_DIM = 48
+    SHORTCUT_KERNEL = 1

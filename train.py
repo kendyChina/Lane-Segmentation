@@ -1,21 +1,23 @@
+import os
+import time
+
 import numpy as np
-import os, shutil, time
-from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from utils.data_feeder import train_loader, val_loader
-from utils.loss.focal_loss import FocalLoss
-from utils.loss.focal_loss import FocalLoss
-from utils.loss.dice_loss import DC_and_CE_loss
-from utils.earlystop import PaW, EarlyStopping
-from models.UNet import UNet
-from config import CONFIG
+from tqdm import tqdm
 
-checkpoint_file = "checkpoint.pt"
+from config import CONFIG
+from models.UNet import UNet
+from utils.data_feeder import train_loader, val_loader
+from utils.earlystop import PaW, EarlyStopping
+
+checkpoint_file = "checkpoint_unet.pt"
+
 
 def now():
     return time.strftime("%Y-%m-%d %H:%M:%S ", time.localtime())
+
 
 # MIoU: Mean Intersection over Union
 class MeanIoU(object):
@@ -65,7 +67,7 @@ class MeanIoU(object):
         self.getConfusionMatrix()
         return self.meanIntersectionOverUnion()
 
-def compute_iou(pred, label, miou):
+def compute_iou(pred, label, iou):
     """
     pred : [N, H, W]
     label: [N, H, W]
@@ -73,13 +75,13 @@ def compute_iou(pred, label, miou):
     pred = pred.cpu().numpy()
     label = label.cpu().numpy()
     for i in range(CONFIG.NUM_CLASSES):
-        single_label = label == i
         single_pred = pred == i
-        temp_tp = np.sum(single_label * single_pred)
+        single_label = label == i
+        temp_tp = np.sum(single_pred * single_label)
         temp_ta = np.sum(single_pred) + np.sum(single_label) - temp_tp
-        miou["TP"][i] += temp_tp
-        miou["TA"][i] += temp_ta
-    return miou
+        iou["TP"][i] += temp_tp
+        iou["TA"][i] += temp_ta
+    return iou
 
 
 def weights_init(m):
@@ -129,6 +131,7 @@ class Main(object):
         total_mask_loss = 0.0
         dataprocess = tqdm(val_loader)
         dataprocess.set_description_str("epoch:{}".format(self.epoch))
+        # iou is for sum TP and TA of each class
         iou = {"TP": {i: 0 for i in range(CONFIG.NUM_CLASSES)},
                "TA": {i: 0 for i in range(CONFIG.NUM_CLASSES)}}
         for batch_idx, batch_item in enumerate(dataprocess):
@@ -143,13 +146,13 @@ class Main(object):
             dataprocess.set_postfix_str("mask_loss:{:.4f}".format(total_mask_loss / (batch_idx + 1)))
 
         total_iou = 0.0
-        for i in range(1, CONFIG.NUM_CLASSES): # ignore class 0
+        for i in range(CONFIG.NUM_CLASSES):
             iou_i = iou["TP"][i] / iou["TA"][i]
             iou_string = "Class{}'s iou: {:.4f}".format(i, iou_i)
-            total_iou += iou_i
-            print(iou_string)
-            self.trainingF.write(iou_string)
-        self.print_and_write("MIoU is: {:.4f}".format(total_iou / CONFIG.NUM_CLASSES))
+            self.print_and_write(iou_string)
+            if i > 0: # ignore class 0
+                total_iou += iou_i
+        self.print_and_write("MIoU is: {:.4f} (ignore class 0)".format(total_iou / (CONFIG.NUM_CLASSES - 1)))
 
         avg_loss = total_mask_loss / len(val_loader)
         self.print_and_write("mask loss is {:.4f}".format(avg_loss))
@@ -166,7 +169,7 @@ class Main(object):
         else:
             self.model.apply(weights_init)  # init
             self.print_and_write("init weights succeed")
-        for epoch in range(1, CONFIG.EPOCHS + 1):
+        for epoch in range(28, CONFIG.EPOCHS + 28):
             self.print_and_write("********** EPOCH {} **********".format(epoch))
             self.epoch = epoch
             self.train_epoch()
@@ -174,6 +177,7 @@ class Main(object):
             if self.earlystop.early_stop:
                 self.print_and_write("Early stopping")
                 break
+            self.print_and_write("\n")
         self.trainingF.close()
 
 
