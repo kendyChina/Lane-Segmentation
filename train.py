@@ -9,10 +9,9 @@ from tqdm import tqdm
 
 from config import CONFIG
 from models.UNet import UNet
+from models.deeplabv3p import DeeplabV3Plus
 from utils.data_feeder import train_loader, val_loader
 from utils.earlystop import PaW, EarlyStopping
-
-checkpoint_file = "checkpoint_unet.pt"
 
 
 def now():
@@ -91,8 +90,11 @@ def weights_init(m):
 
 class Main(object):
     def __init__(self, network="UNet"):
-        if "UNet" in network:
+        network = network.lower()
+        if "unet" in network:
             self.model = UNet()
+        elif "deeplab" in network:
+            self.model = DeeplabV3Plus(pretrained=True)
         else:
             raise ValueError("Network is not support")
         if CONFIG.CUDA_AVAIL:
@@ -101,7 +103,7 @@ class Main(object):
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=CONFIG.BASE_LR, weight_decay=CONFIG.WEIGHT_DECAY)
         self.calc_loss = nn.CrossEntropyLoss()
-        self.trainingF = open(os.path.join(CONFIG.SAVE_PATH, "training.csv"), mode="a")
+        self.trainingF = open(os.path.join(CONFIG.SAVE_PATH, CONFIG.LOGGING_FILE), mode="a")
         self.earlystop = EarlyStopping(self.trainingF, verbose=True)
         self.print_and_write = PaW(self.trainingF)
 
@@ -162,14 +164,14 @@ class Main(object):
 
 
     def run(self):
-        checkpoint_path = os.path.join(CONFIG.SAVE_PATH, checkpoint_file)
+        checkpoint_path = os.path.join(CONFIG.SAVE_PATH, CONFIG.CHECKPOINT_FILE)
         if os.path.exists(checkpoint_path):
             self.model.load_state_dict(torch.load(checkpoint_path))
             self.print_and_write("load checkpoint succeed")
         else:
             self.model.apply(weights_init)  # init
             self.print_and_write("init weights succeed")
-        for epoch in range(28, CONFIG.EPOCHS + 28):
+        for epoch in range(1, CONFIG.EPOCHS + 1):
             self.print_and_write("********** EPOCH {} **********".format(epoch))
             self.epoch = epoch
             self.train_epoch()

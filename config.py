@@ -16,10 +16,14 @@ class CONFIG(object):
     SET_DEVICE = 2
 
     SAVE_PATH = "logs"
+    # CHECKPOINT_FILE = "checkpoint_unet.pt"
+    CHECKPOINT_FILE = "checkpoint_deeplabv3p.pt"
+    # LOGGING_FILE = "training_unet.csv"
+    LOGGING_FILE = "training_deeplabv3p.csv"
 
     """train config"""
     EPOCHS = 200
-    BATCH_SIZE = 2
+    BATCH_SIZE = 8
     # IMG_SIZE = [1024, 384]
     IMG_SIZE = [256, 96]
     # IMG_SIZE = [64, 24]
@@ -31,5 +35,6 @@ class CONFIG(object):
     OUTPUT_STRIDE = 8
     # OUTPUT_STRIDE = 16
     ASPP_OUTDIM = 256
+    GROUPS_FOR_NORM = 32
     SHORTCUT_DIM = 48
     SHORTCUT_KERNEL = 1
