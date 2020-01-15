@@ -1,7 +1,6 @@
 import os
 import time
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,75 +11,7 @@ from models.UNet import UNet
 from models.deeplabv3p import DeeplabV3Plus
 from utils.data_feeder import train_loader, val_loader
 from utils.earlystop import PaW, EarlyStopping
-
-
-def now():
-    return time.strftime("%Y-%m-%d %H:%M:%S ", time.localtime())
-
-
-# MIoU: Mean Intersection over Union
-class MeanIoU(object):
-    def getConfusionMatrix(self):
-        # print(pred)
-        # print(label)
-        # Return True and False
-        mask = (self.label >= 0) & (self.label < self.num_classes)
-        # print(mask)
-        # print(label[mask])
-        # print(pred[mask])
-        label = self.num_classes * self.label[mask] + self.pred[mask]
-        # print(label)
-        count = np.bincount(label, minlength=self.num_classes ** 2)
-        # print(count)
-        confusionMatrix = count.reshape(self.num_classes, self.num_classes)
-        # print(confusionMatrix)
-        self.confusionMatrix = confusionMatrix
-
-    def meanIntersectionOverUnion(self):
-        # IoU = TP / (TP + FP + FN) = intersection / union
-        intersection = np.diag(self.confusionMatrix) # 取对角线值，返回list
-        # print(intersection)
-        union = np.sum(self.confusionMatrix, axis=1) + np.sum(self.confusionMatrix, axis=0)
-        # print(union)
-        IoU = []
-        for i, val in enumerate(intersection):
-            if union[i] != 0:
-                IoU.append(intersection[i] / union[i])
-            else:
-                IoU.append(1.0)
-        # print(IoU)
-        mIoU = np.nanmean(IoU) # Compute the mean of each IoU
-        # print(mIoU)
-        return mIoU
-
-    def __call__(self, pred, label):
-        self.num_classes = CONFIG.NUM_CLASSES
-        pred = pred.cpu()
-        label = label.cpu()
-        pred = torch.argmax(F.softmax(pred, dim=1), dim=1)
-        # print(pred.shape)
-        # print(label.shape)
-        assert pred.shape[-2:] == label.shape[-2:]
-        self.pred = pred
-        self.label = label
-        self.getConfusionMatrix()
-        return self.meanIntersectionOverUnion()
-
-def compute_iou(pred, label, iou):
-    """
-    pred : [N, H, W]
-    label: [N, H, W]
-    """
-    pred = pred.cpu().numpy()
-    label = label.cpu().numpy()
-    for i in range(CONFIG.NUM_CLASSES):
-        single_pred = pred == i
-        single_label = label == i
-        temp_tp = np.sum(single_pred * single_label)
-        temp_ta = np.sum(single_pred) + np.sum(single_label) - temp_tp
-        iou["TP"][i] += temp_tp
-        iou["TA"][i] += temp_ta
-    return iou
+from utils.metrics import compute_iou
 
 
 def weights_init(m):
@@ -88,13 +19,14 @@ def weights_init(m):
         nn.init.xavier_normal_(m.weight)
         nn.init.constant_(m.bias, 0.0)
 
+
 class Main(object):
     def __init__(self, network="UNet"):
         network = network.lower()
         if "unet" in network:
             self.model = UNet()
         elif "deeplab" in network:
-            self.model = DeeplabV3Plus(pretrained=True)
+            self.model = DeeplabV3Plus(pretrained=CONFIG.PRETRAIN)
         else:
             raise ValueError("Network is not support")
         if CONFIG.CUDA_AVAIL:
@@ -154,7 +86,7 @@ class Main(object):
             self.print_and_write(iou_string)
             if i > 0: # ignore class 0
                 total_iou += iou_i
-        self.print_and_write("MIoU is: {:.4f} (ignore class 0)".format(total_iou / (CONFIG.NUM_CLASSES - 1)))
+        self.print_and_write("MIoU is: {:.4f} (without class 0)".format(total_iou / (CONFIG.NUM_CLASSES - 1)))
 
         avg_loss = total_mask_loss / len(val_loader)
         self.print_and_write("mask loss is {:.4f}".format(avg_loss))
@@ -171,6 +103,10 @@ class Main(object):
         else:
             self.model.apply(weights_init)  # init
             self.print_and_write("init weights succeed")
+        self.print_and_write("Parameters:\n"
+                             "\tBatch size: {}\n"
+                             "Image size: {}\n"
+                             "Learning rate: {}\n")
         for epoch in range(1, CONFIG.EPOCHS + 1):
             self.print_and_write("********** EPOCH {} **********".format(epoch))
             self.epoch = epoch

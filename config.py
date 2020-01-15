@@ -13,7 +13,7 @@ class CONFIG(object):
         CUDA_AVAIL = torch.cuda.is_available()
     else:
         CUDA_AVAIL = False
-    SET_DEVICE = 2
+    SET_DEVICE = 1
 
     SAVE_PATH = "logs"
     # CHECKPOINT_FILE = "checkpoint_unet.pt"
@@ -23,7 +23,7 @@ class CONFIG(object):
 
     """train config"""
     EPOCHS = 200
-    BATCH_SIZE = 8
+    BATCH_SIZE = 4
     # IMG_SIZE = [1024, 384]
     IMG_SIZE = [256, 96]
     # IMG_SIZE = [64, 24]
@@ -32,6 +32,7 @@ class CONFIG(object):
     BASE_LR = 6.0e-4
 
     """deeplabv3p config"""
+    PRETRAIN = True
     OUTPUT_STRIDE = 8
     # OUTPUT_STRIDE = 16
     ASPP_OUTDIM = 256
