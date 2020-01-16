@@ -230,7 +230,6 @@ class DeeplabV3Plus(nn.Module):
             nn.GroupNorm(32, CONFIG.ASPP_OUTDIM),
             nn.ReLU(inplace=True),
             nn.Dropout(0.1),
-            nn.GroupNorm
         )
         self.cls_conv = nn.Conv2d(CONFIG.ASPP_OUTDIM, CONFIG.NUM_CLASSES, 1, 1, padding=0)
         for m in self.modules():

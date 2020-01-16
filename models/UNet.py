@@ -56,7 +56,7 @@ class UNetUpBlock(nn.Module):
 
 class UNet(nn.Module):
     def __init__(self, in_chnl=3, base_chnl=64, n_classes=8, depth=5,
-                 padding=0, batch_norm=False, up_mode="upconv"):
+                 padding=0, batch_norm=False, up_mode="upconv", **kwargs):
         super(UNet, self).__init__()
         assert up_mode in ("upconv", "upsample")
         self.depth = depth

@@ -1,5 +1,5 @@
 import os
-import cv2
+from PIL import Image
 import torch
 import numpy as np
 from config import CONFIG
@@ -12,33 +12,32 @@ from utils.process_labels import decode_color_labels
 #for dvi in range(torch.cuda.device_count()):
 #    print(torch.cuda.get_device_name(dvi))
 
-predict_net = 'deeplabv3p'
 nets = {'deeplabv3p': DeeplabV3Plus, 'unet': UNet}
 
 
-def load_model(model_path):
+def load_model(predict_net, model_path):
 
-    net = nets[predict_net]()
+    net = nets[predict_net](pretrained=False)
     net.eval()
     if CONFIG.CUDA_AVAIL:
         net = net.cuda()
-        map_location = 'cuda:'
+        map_location = 'cuda:{}'.format(CONFIG.CUDA_DEVICE)
     else:
         map_location = 'cpu'
 
-    model_param = torch.load(model_path, map_location=map_location)['state_dict']
+    model_param = torch.load(model_path, map_location=map_location)
     model_param = {k.replace('module.', ''):v for k, v in model_param.items()}
     net.load_state_dict(model_param)
     return net
 
 
 def img_transform(img):
-    img = crop_resize_data(img)
+    img = crop_resize_data(img, image_size=CONFIG.IMG_SIZE, offset=CONFIG.OFFSET)
     img = np.transpose(img, (2, 0, 1))
     img = img[np.newaxis, ...].astype(np.float32)
     img = torch.from_numpy(img.copy())
-    if torch.cuda.is_available():
-        img = img.cuda(device=device_id)
+    if CONFIG.CUDA_AVAIL:
+        img = img.cuda(device=CONFIG.CUDA_DEVICE)
     return img
 
 
@@ -55,18 +54,19 @@ def get_color_mask(pred):
 
 
 def main():
+    predict_net = 'unet'
     model_dir = 'logs'
-    test_dir = 'test_example'
-    model_path = os.path.join(model_dir,  'finalNet.pth.tar')
-    net = load_model(model_path)
+    test_dir = r'/root/data/LaneSeg/Image_Data/Road02/Record001/Camera 5/'
+    model_path = os.path.join(model_dir,  'checkpoint_unet.pt')
+    net = load_model(predict_net, model_path)
 
-    img_path = os.path.join(test_dir, 'test.jpg')
-    img = cv2.imread(img_path)
+    img_path = os.path.join(test_dir, '170927_063811892_Camera_5.jpg')
+    img = Image.open(img_path)
     img = img_transform(img)
 
     pred = net(img)
     color_mask = get_color_mask(pred)
-    cv2.imwrite(os.path.join(test_dir, 'color_mask.jpg'), color_mask)
+    Image.fromarray(color_mask).save(os.path.join('color_mask.jpg'), "jpg")
 
 
 if __name__ == '__main__':

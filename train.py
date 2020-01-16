@@ -30,7 +30,7 @@ class Main(object):
         else:
             raise ValueError("Network is not support")
         if CONFIG.CUDA_AVAIL:
-            torch.cuda.set_device(CONFIG.SET_DEVICE)
+            torch.cuda.set_device(CONFIG.CUDA_DEVICE)
             self.model = self.model.cuda()
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=CONFIG.BASE_LR, weight_decay=CONFIG.WEIGHT_DECAY)
@@ -120,5 +120,5 @@ class Main(object):
 
 
 if __name__ == '__main__':
-    main = Main()
+    main = Main(network=CONFIG.MODEL)
     main.run()
