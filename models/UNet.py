@@ -7,7 +7,6 @@ class UNetConvBlock(nn.Module):
     def __init__(self, in_chnl, out_chnl, padding, batch_norm):
         super(UNetConvBlock, self).__init__()
         block = []
-        padding = 1 # To keep i' == i...padding = (kernel_size - 1) //2
 
         block.append(nn.Conv2d(in_chnl, out_chnl, kernel_size=3, padding=padding))
         if batch_norm:
@@ -56,7 +55,7 @@ class UNetUpBlock(nn.Module):
 
 class UNet(nn.Module):
     def __init__(self, in_chnl=3, base_chnl=64, n_classes=8, depth=5,
-                 padding=0, batch_norm=False, up_mode="upconv", **kwargs):
+                 padding=1, batch_norm=False, up_mode="upconv", **kwargs):
         super(UNet, self).__init__()
         assert up_mode in ("upconv", "upsample")
         self.depth = depth
@@ -65,6 +64,7 @@ class UNet(nn.Module):
         self.down_path = nn.ModuleList()
         for _ in range(depth):
             out_chnl *= 2
+            # To keep i' == i    padding = (kernel_size - 1) //2
             self.down_path.append(UNetConvBlock(in_chnl, out_chnl,
                                                 padding=padding, batch_norm=batch_norm))
             in_chnl = out_chnl

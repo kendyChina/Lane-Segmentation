@@ -16,8 +16,13 @@ def encode_labels(color_mask):
 
     return encode_mask
 
-"""Decode the labels's trainId to id"""
+
 def decode_labels(labels):
+    """
+    Decode the labels's trainId to id
+    :param labels:
+    :return:
+    """
     decode_mask = np.zeros((labels.size[0], labels.size[1]), dtype='uint8')
     id = {0: 0, 1: 204, 2: 203, 3: 217, 4: 210, 5: 214, 6: 224, 7: 227}
     for i in range(len(id)):
@@ -25,40 +30,20 @@ def decode_labels(labels):
 
     return decode_mask
 
-"""Decode the labels's trainId to color"""
+
 def decode_color_labels(labels):
-    decode_mask = np.zeros((3, labels.size[0], labels.size[1]), dtype='uint8')
-    # 0
-    decode_mask[0][labels == 0] = 0
-    decode_mask[1][labels == 0] = 0
-    decode_mask[2][labels == 0] = 0
-    # 1
-    decode_mask[0][labels == 1] = 70
-    decode_mask[1][labels == 1] = 130
-    decode_mask[2][labels == 1] = 180
-    # 2
-    decode_mask[0][labels == 2] = 0
-    decode_mask[1][labels == 2] = 0
-    decode_mask[2][labels == 2] = 142
-    # 3
-    decode_mask[0][labels == 3] = 153
-    decode_mask[1][labels == 3] = 153
-    decode_mask[2][labels == 3] = 153
-    # 4
-    decode_mask[0][labels == 4] = 128
-    decode_mask[1][labels == 4] = 64
-    decode_mask[2][labels == 4] = 128
-    # 5
-    decode_mask[0][labels == 5] = 190
-    decode_mask[1][labels == 5] = 153
-    decode_mask[2][labels == 5] = 153
-    # 6
-    decode_mask[0][labels == 6] = 0
-    decode_mask[1][labels == 6] = 0
-    decode_mask[2][labels == 6] = 230
-    # 7
-    decode_mask[0][labels == 7] = 255
-    decode_mask[1][labels == 7] = 128
-    decode_mask[2][labels == 7] = 0
+    """
+    Decode the labels's trainId to color
+    :param labels: numpy.ndarray
+    :return:
+    """
+    decode_mask = np.zeros((3, labels.shape[0], labels.shape[1]), dtype='uint8')
+    color_map = {0: (0, 0, 0), 1: (70, 130, 180), 2: (0, 0, 142), 3: (153, 153, 153),
+                 4: (128, 64, 128), 5: (190, 153, 153), 6: (0, 0, 230), 7: (255, 128, 0)}
+    for k in color_map:
+        decode_mask[0][labels == k] = color_map[k][0]
+        decode_mask[1][labels == k] = color_map[k][1]
+        decode_mask[2][labels == k] = color_map[k][2]
+
 
     return decode_mask

@@ -45,6 +45,8 @@ class Main(object):
         total_mask_loss = 0.0
         dataprocess = tqdm(train_loader)
         dataprocess.set_description_str("epoch:{}".format(self.epoch))
+        iou = {"TP": {i: 0 for i in range(CONFIG.NUM_CLASSES)},
+               "TA": {i: 0 for i in range(CONFIG.NUM_CLASSES)}}
         for batch_idx, batch_item in enumerate(dataprocess):
             image, label = batch_item["image"], batch_item["label"]
             if CONFIG.CUDA_AVAIL:
@@ -55,7 +57,18 @@ class Main(object):
             total_mask_loss += mask_loss.item()
             mask_loss.backward()
             self.optimizer.step()
+            pred = torch.argmax(F.softmax(pred, dim=1), dim=1)
+            iou = compute_iou(pred, label, iou)
             dataprocess.set_postfix_str("mask_loss:{:.4f}".format(total_mask_loss/ (batch_idx + 1)))
+
+        total_iou = 0.0
+        for i in range(CONFIG.NUM_CLASSES):
+            iou_i = iou["TP"][i] / iou["TA"][i]
+            iou_string = "Class{}'s iou: {:.4f}".format(i, iou_i)
+            self.print_and_write(iou_string)
+            if i > 0:  # ignore class 0
+                total_iou += iou_i
+        self.print_and_write("MIoU is: {:.4f} (without class 0)".format(total_iou / (CONFIG.NUM_CLASSES - 1)))
         self.print_and_write("mask loss is {:.4f}".format(total_mask_loss / len(train_loader)))
         self.trainingF.flush()
 
@@ -101,13 +114,13 @@ class Main(object):
             self.model.load_state_dict(torch.load(checkpoint_path))
             self.print_and_write("load checkpoint succeed")
         else:
-            self.model.apply(weights_init)  # init
+            # self.model.apply(weights_init)  # init
             self.print_and_write("init weights succeed")
         self.print_and_write("Parameters:\n"
                              "\tBatch size: {}\n"
                              "Image size: {}\n"
-                             "Learning rate: {}\n")
-        for epoch in range(1, CONFIG.EPOCHS + 1):
+                             "Learning rate: {}\n".format(CONFIG.BATCH_SIZE, CONFIG.IMG_SIZE, CONFIG.BASE_LR))
+        for epoch in range(38, CONFIG.EPOCHS + 38):
             self.print_and_write("********** EPOCH {} **********".format(epoch))
             self.epoch = epoch
             self.train_epoch()

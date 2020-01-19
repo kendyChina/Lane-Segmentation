@@ -21,6 +21,17 @@ def crop_resize_data(image, label=None, image_size=[1024, 384], offset=690):
     else:
         return train_image
 
+
+def reshape_data(pred, image_size, offset=0):
+    W, H = image_size
+    h = H - offset
+    pred = Image.fromarray(pred)
+    pred = pred.resize((W, h), resample=Image.BILINEAR)
+    pred = np.array(pred)
+    pred = np.pad(pred, ((offset, 0), (0, 0)))
+    return pred
+
+
 class LaneDataset(Dataset):
     def __init__(self, csv_file, image_size=[1024, 384], offset=690, transform=None):
         super(LaneDataset, self).__init__()

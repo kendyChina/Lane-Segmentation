@@ -30,7 +30,7 @@ class CONFIG(object):
     # IMG_SIZE = [64, 24]
     OFFSET = 690
     WEIGHT_DECAY = 1.0e-4
-    BASE_LR = 6.0e-4
+    BASE_LR = 6.0e-3
 
     """deeplabv3p config"""
     PRETRAIN = True

@@ -43,7 +43,7 @@ class ASPP(nn.Module):
         self.branch5_avg = nn.AdaptiveAvgPool2d(1)
         self.branch5_conv = nn.Conv2d(in_chans, out_chans, 1, 1, 0, bias=True)
         # self.branch5_bn = nn.BatchNorm2d(out_chans)
-        self.branch5_bn = nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, out_chans),
+        self.branch5_gn = nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, out_chans)
         self.branch5_relu = nn.ReLU(inplace=True)
         self.conv_cat = nn.Sequential(
             nn.Conv2d(out_chans * 5, out_chans, 1, 1, padding=0, bias=True),
@@ -58,7 +58,7 @@ class ASPP(nn.Module):
         conv3x3_2 = self.branch3(x)
         conv3x3_3 = self.branch4(x)
         global_feature = self.branch5_avg(x)
-        global_feature = self.branch5_relu(self.branch5_bn(self.branch5_conv(global_feature)))
+        global_feature = self.branch5_relu(self.branch5_gn(self.branch5_conv(global_feature)))
         global_feature = F.interpolate(global_feature, (h, w), None, 'bilinear', True)
 
         feature_cat = torch.cat([conv1x1, conv3x3_1, conv3x3_2, conv3x3_3, global_feature], dim=1)
@@ -154,14 +154,14 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(in_chans, out_chans, kernel_size=1, bias=False)
         # self.bn1 = nn.BatchNorm2d(out_chans)
-        self.bn1 = nn.GroupNorm(32, out_chans)
+        self.bn1 = nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, out_chans)
         self.conv2 = nn.Conv2d(out_chans, out_chans, kernel_size=3, stride=stride,
                                padding=1 * atrous, dilation=atrous, bias=False)
         # self.bn2 = nn.BatchNorm2d(out_chans)
-        self.bn2 = nn.GroupNorm(32, out_chans)
+        self.bn2 = nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, out_chans)
         self.conv3 = nn.Conv2d(out_chans, out_chans * self.expansion, kernel_size=1, bias=False)
         # self.bn3 = nn.BatchNorm2d(out_chans * self.expansion)
-        self.bn3 = nn.GroupNorm(32, out_chans * self.expansion)
+        self.bn3 = nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, out_chans * self.expansion)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
@@ -222,12 +222,12 @@ class DeeplabV3Plus(nn.Module):
         self.cat_conv = nn.Sequential(
             nn.Conv2d(CONFIG.ASPP_OUTDIM + CONFIG.SHORTCUT_DIM, CONFIG.ASPP_OUTDIM, 3, 1, padding=1, bias=False),
             # nn.BatchNorm2d(CONFIG.ASPP_OUTDIM),
-            nn.GroupNorm(32, CONFIG.ASPP_OUTDIM),
+            nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, CONFIG.ASPP_OUTDIM),
             nn.ReLU(inplace=True),
             nn.Dropout(0.5),
             nn.Conv2d(CONFIG.ASPP_OUTDIM, CONFIG.ASPP_OUTDIM, 3, 1, padding=1, bias=False),
             # nn.BatchNorm2d(CONFIG.ASPP_OUTDIM),
-            nn.GroupNorm(32, CONFIG.ASPP_OUTDIM),
+            nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, CONFIG.ASPP_OUTDIM),
             nn.ReLU(inplace=True),
             nn.Dropout(0.1),
         )
