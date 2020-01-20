@@ -6,8 +6,16 @@ import torch
 from torch.utils.data import Dataset
 from utils.process_labels import encode_labels
 
-"""Crop and resize the data or label"""
+
 def crop_resize_data(image, label=None, image_size=[1024, 384], offset=690):
+    """
+    Crop and resize the data or label
+    :param image: PIL.Image
+    :param label: PIL.Image
+    :param image_size: list or tuple with two values
+    :param offset: int
+    :return:
+    """
     (width, height) = image.size
     (left, upper, right, lower) = (0, offset, width, height)
     roi_image = image.crop((left, upper, right, lower))
@@ -18,8 +26,8 @@ def crop_resize_data(image, label=None, image_size=[1024, 384], offset=690):
         roi_label = label.crop((left, upper, right, lower))
         train_label = roi_label.resize(tuple(image_size), resample=Image.NEAREST)
         return train_image, train_label
-    else:
-        return train_image
+
+    return train_image
 
 
 def reshape_data(pred, image_size, offset=0):

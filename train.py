@@ -1,5 +1,4 @@
 import os
-import time
 
 import torch
 import torch.nn as nn
@@ -113,14 +112,14 @@ class Main(object):
         if os.path.exists(checkpoint_path):
             self.model.load_state_dict(torch.load(checkpoint_path))
             self.print_and_write("load checkpoint succeed")
-        else:
+        # else:
             # self.model.apply(weights_init)  # init
-            self.print_and_write("init weights succeed")
+            # self.print_and_write("init weights succeed")
         self.print_and_write("Parameters:\n"
                              "\tBatch size: {}\n"
-                             "Image size: {}\n"
-                             "Learning rate: {}\n".format(CONFIG.BATCH_SIZE, CONFIG.IMG_SIZE, CONFIG.BASE_LR))
-        for epoch in range(38, CONFIG.EPOCHS + 38):
+                             "\tImage size: {}\n"
+                             "\tLearning rate: {}\n".format(CONFIG.BATCH_SIZE, CONFIG.IMG_SIZE, CONFIG.BASE_LR))
+        for epoch in range(1, CONFIG.EPOCHS + 1):
             self.print_and_write("********** EPOCH {} **********".format(epoch))
             self.epoch = epoch
             self.train_epoch()

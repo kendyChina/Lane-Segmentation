@@ -32,8 +32,7 @@ class EarlyStopping:
         self.counter = 0
         self.best_score = None
         self.early_stop = False
-        # self.val_loss_min = np.Inf
-        self.val_loss_min = 0.049265
+        self.val_loss_min = CONFIG.MIN_LOSS
         self.delta = delta
         self.print_and_write = PaW(self.file)
 
