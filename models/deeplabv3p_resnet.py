@@ -11,6 +11,47 @@ model_urls = {
     'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth'
 }
 
+class Bottleneck(nn.Module):
+    expansion = 4
+
+    def __init__(self, in_chans, out_chans, stride=1, atrous=1, downsample=None):
+        super(Bottleneck, self).__init__()
+        self.conv1 = nn.Conv2d(in_chans, out_chans, kernel_size=1, bias=False)
+        # self.bn1 = nn.BatchNorm2d(out_chans)
+        self.bn1 = nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, out_chans)
+        self.conv2 = nn.Conv2d(out_chans, out_chans, kernel_size=3, stride=stride,
+                               padding=1 * atrous, dilation=atrous, bias=False)
+        # self.bn2 = nn.BatchNorm2d(out_chans)
+        self.bn2 = nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, out_chans)
+        self.conv3 = nn.Conv2d(out_chans, out_chans * self.expansion, kernel_size=1, bias=False)
+        # self.bn3 = nn.BatchNorm2d(out_chans * self.expansion)
+        self.bn3 = nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, out_chans * self.expansion)
+        self.relu = nn.ReLU(inplace=True)
+        self.downsample = downsample
+        self.stride = stride
+
+    def forward(self, x):
+        residual = x
+
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+
+        out = self.conv3(out)
+        out = self.bn3(out)
+
+        if self.downsample is not None:
+            residual = self.downsample(x)
+
+        out += residual
+        out = self.relu(out)
+
+        return out
+
 
 class ASPP(nn.Module):
 
@@ -92,6 +133,9 @@ def _make_layer(block, in_chans, out_chans, blocks, stride=1, atrous=None):
 class ResNetAtrous(nn.Module):
 
     def __init__(self, block, layers, atrous=None):
+        # layers = [3, 4, 6, 3]
+        # atrous = [1, 2, 1]
+        # stride_list = [2, 1, 1]
         super(ResNetAtrous, self).__init__()
         os = CONFIG.OUTPUT_STRIDE
         if os == 8:
@@ -123,7 +167,7 @@ class ResNetAtrous(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, nn.BatchNorm2d):
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.GroupNorm):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
@@ -147,48 +191,6 @@ class ResNetAtrous(nn.Module):
         return layers_list
 
 
-class Bottleneck(nn.Module):
-    expansion = 4
-
-    def __init__(self, in_chans, out_chans, stride=1, atrous=1, downsample=None):
-        super(Bottleneck, self).__init__()
-        self.conv1 = nn.Conv2d(in_chans, out_chans, kernel_size=1, bias=False)
-        # self.bn1 = nn.BatchNorm2d(out_chans)
-        self.bn1 = nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, out_chans)
-        self.conv2 = nn.Conv2d(out_chans, out_chans, kernel_size=3, stride=stride,
-                               padding=1 * atrous, dilation=atrous, bias=False)
-        # self.bn2 = nn.BatchNorm2d(out_chans)
-        self.bn2 = nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, out_chans)
-        self.conv3 = nn.Conv2d(out_chans, out_chans * self.expansion, kernel_size=1, bias=False)
-        # self.bn3 = nn.BatchNorm2d(out_chans * self.expansion)
-        self.bn3 = nn.GroupNorm(CONFIG.GROUPS_FOR_NORM, out_chans * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
-        self.downsample = downsample
-        self.stride = stride
-
-    def forward(self, x):
-        residual = x
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-        out = self.relu(out)
-
-        out = self.conv3(out)
-        out = self.bn3(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out += residual
-        out = self.relu(out)
-
-        return out
-
-
 def resnet50_atrous(pretrained=True):
     """Constructs a atrous ResNet-50 model."""
     model = ResNetAtrous(Bottleneck, [3, 4, 6, 3], atrous=[1, 2, 1])
@@ -201,9 +203,10 @@ def resnet50_atrous(pretrained=True):
     return model
 
 
-class DeeplabV3Plus(nn.Module):
+class RESNETDeeplabV3Plus(nn.Module):
+
     def __init__(self, pretrained=True):
-        super(DeeplabV3Plus, self).__init__()
+        super(RESNETDeeplabV3Plus, self).__init__()
         self.backbone = resnet50_atrous(pretrained=pretrained)
         input_channel = 2048
         self.aspp = ASPP(in_chans=input_channel, out_chans=CONFIG.ASPP_OUTDIM, rate=16 // CONFIG.OUTPUT_STRIDE)
@@ -236,19 +239,28 @@ class DeeplabV3Plus(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, nn.BatchNorm2d):
+            elif isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.GroupNorm):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         layers = self.backbone(x)
+        print(layers[-1].size())
         feature_aspp = self.aspp(layers[-1])
         feature_aspp = self.dropout1(feature_aspp)
         feature_aspp = self.upsample_sub(feature_aspp)
 
         feature_shallow = self.shortcut_conv(layers[0])
+        print(feature_aspp.size())
+        print(feature_shallow.size())
         feature_cat = torch.cat([feature_aspp, feature_shallow], 1)
         result = self.cat_conv(feature_cat)
         result = self.cls_conv(result)
         result = self.upsample4(result)
         return result
+
+
+if __name__ == '__main__':
+    from torchsummary import summary
+    model = RESNETDeeplabV3Plus(pretrained=False)
+    summary(model, (3, 256, 96))

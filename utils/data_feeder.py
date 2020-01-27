@@ -18,7 +18,8 @@ train_dataset = LaneDataset(train_dir, image_size=CONFIG.IMG_SIZE,
                                offset=CONFIG.OFFSET, transform=transforms.Compose([ToTensor()]))
 val_dataset = LaneDataset(val_dir, image_size=CONFIG.IMG_SIZE,
                           offset=CONFIG.OFFSET, transform=transforms.Compose([ToTensor()]))
-test_dataset = LaneDataset(test_dir)
+test_dataset = LaneDataset(test_dir, image_size=CONFIG.IMG_SIZE,
+                           offset=CONFIG.OFFSET, transform=transforms.Compose([ToTensor()]))
 
 
 # drop_last: drop the last data in each epoches
@@ -28,4 +29,5 @@ train_loader = DataLoader(train_dataset, batch_size=CONFIG.BATCH_SIZE,
 val_loader = DataLoader(val_dataset, batch_size=CONFIG.BATCH_SIZE,
                         shuffle=False, drop_last=False, **kwargs)
 
-
+test_loader = DataLoader(test_dataset, batch_size=CONFIG.BATCH_SIZE,
+                        shuffle=False, drop_last=False, **kwargs)

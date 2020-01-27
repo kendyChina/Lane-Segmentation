@@ -3,7 +3,7 @@ from PIL import Image
 import torch
 import numpy as np
 from config import CONFIG
-from models.deeplabv3p import DeeplabV3Plus
+from models.deeplabv3p_resnet import RESNETDeeplabV3Plus
 from models.UNet import UNet
 from utils.image_process import crop_resize_data, reshape_data
 from utils.process_labels import decode_color_labels
@@ -12,7 +12,7 @@ from utils.process_labels import decode_color_labels
 #for dvi in range(torch.cuda.device_count()):
 #    print(torch.cuda.get_device_name(dvi))
 
-nets = {'deeplabv3p': DeeplabV3Plus, 'unet': UNet}
+nets = {'deeplabv3p': RESNETDeeplabV3Plus, 'unet': UNet}
 
 
 def load_model(predict_net, model_path):

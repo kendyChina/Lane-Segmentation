@@ -1,8 +1,9 @@
 import torch
+import numpy as np
 
 class CONFIG(object):
     """
-        to config the network
+        to config the project
     """
     """network config"""
     NUM_CLASSES = 8
@@ -13,27 +14,30 @@ class CONFIG(object):
         CUDA_AVAIL = torch.cuda.is_available()
     else:
         CUDA_AVAIL = False
-    CUDA_DEVICE = 6
+    CUDA_DEVICE = 3
 
     SAVE_PATH = "logs"
-    # CHECKPOINT_FILE = "checkpoint_unet.pt"
-    CHECKPOINT_FILE = "checkpoint_deeplabv3p.pt"
-    # LOGGING_FILE = "training_unet.csv"
-    LOGGING_FILE = "training_deeplabv3p.csv"
+    # CHECKPOINT_FILE = "unet_weight.pt"
+    # CHECKPOINT_FILE = "deeplabv3p_resnet50_weight.pt"
+    CHECKPOINT_FILE = "deeplabv3p_mobilenet_weight.pt"
+    # LOGGING_FILE = "unet_logs.csv"
+    # LOGGING_FILE = "deeplabv3p_resnet50_logs.csv"
+    LOGGING_FILE = "deeplabv3p_mobilenet_logs.csv"
 
     """train config"""
     # MODEL = "unet"
-    MODEL = "deeplabv3p"
+    # MODEL = "deeplabv3p_resnet"
+    MODEL = "deeplabv3p_mobilenet"
     EPOCHS = 200
     BATCH_SIZE = 4
     # IMG_SIZE = [1024, 384]
     IMG_SIZE = [256, 96]
     # IMG_SIZE = [64, 24]
-    # MIN_LOSS = np.Inf
-    MIN_LOSS = 0.039740
+    MIN_LOSS = np.Inf
+    # MIN_LOSS = 0.039740
     OFFSET = 690
     WEIGHT_DECAY = 1.0e-4
-    BASE_LR = 6.0e-6
+    BASE_LR = 1e-3
 
     """deeplabv3p config"""
     PRETRAIN = True
