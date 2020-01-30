@@ -13,6 +13,7 @@ from utils.data_feeder import train_loader, val_loader
 from utils.earlystop import PaW, EarlyStopping
 from utils.metrics import compute_iou
 from utils.visualize import PlotVisdom
+from utils.scheduler import MyReduceLROnPlateau
 
 
 def weights_init(m):
@@ -22,16 +23,22 @@ def weights_init(m):
 
 
 def adjust_lr(optimizer, epoch):
-    if epoch == 0:
-        lr = 1e-3
-    elif epoch == 2:
-        lr = 1e-2
-    elif epoch == 100:
-        lr = 1e-3
-    elif epoch == 150:
-        lr = 1e-4
-    else:
-        return optimizer.param_groups[0]["lr"]
+    # if epoch == 0:
+    #     lr = 1e-3
+    # elif epoch == 2:
+    #     lr = 1e-2
+    # elif epoch == 100:
+    #     lr = 1e-3
+    # elif epoch == 150:
+    #     lr = 1e-4
+    # else:
+    #     return optimizer.param_groups[0]["lr"]
+    lr = optimizer.param_groups[0]["lr"]
+    cos_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=CONFIG.CosineT_max, eta_min=2e-8)
+    if epoch <= 30:
+        lr = cos_scheduler.get_lr()[0]
+        cos_scheduler.step(epoch)
+
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -39,7 +46,10 @@ def adjust_lr(optimizer, epoch):
 
 
 def get_lr_scheduler(optimizer):
-    return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=10, eta_min=2e-8)
+    # return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=CONFIG.CosineT_max, eta_min=2e-8)
+    return MyReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=7, verbose=False,
+                                                      threshold_mode="rel", threshold=1e-4, cooldown=0,
+                                                      min_lr=0, eps=1e-8)
 
 
 class Main(object):
@@ -47,7 +57,7 @@ class Main(object):
     def __init__(self, network="UNet"):
         network = network.lower()
         if "unet" in network:
-            self.model = UNet()
+            self.model = UNet(batch_norm=True)
         elif "deeplabv3p_resnet" in network:
             self.model = RESNETDeeplabV3Plus(pretrained=CONFIG.PRETRAIN)
         elif "deeplabv3p_mobilenet" in network:
@@ -72,7 +82,7 @@ class Main(object):
         self.valid_miou = []
         self.plot_miou = PlotVisdom("miou", ["train", "valid"])
 
-        self.plot_lr = PlotVisdom("LearningRate", "lr")
+        self.plot_lr = PlotVisdom("LearningRate", ["lr",])
 
     def train_epoch(self):
         self.model.train()
@@ -166,16 +176,21 @@ class Main(object):
         for epoch in range(0, CONFIG.EPOCHS + 0):
             self.print_and_write("********** EPOCH {} **********".format(epoch))
             lr = scheduler.get_lr()[0]
+            # lr = adjust_lr(self.optimizer, epoch)
             self.print_and_write("Learning rate: {}".format(lr))
             lr_list.append(lr)
             self.epoch = epoch
             self.train_epoch()
             self.valid_epoch()
-            scheduler.step(epoch)
+            # scheduler.step(epoch)
+            scheduler.step(self.valid_losses[-1])
+
             self.plot_loss(self.train_losses, self.valid_losses)
             self.plot_miou(self.train_miou, self.valid_miou)
             self.plot_lr(lr_list)
+
             torch.save(self.model.state_dict(), os.path.join(CONFIG.SAVE_PATH, CONFIG.CHECKPOINT_FILE))
+
             # if self.earlystop.early_stop:
             #     self.print_and_write("Early stopping")
             #     break
@@ -184,5 +199,9 @@ class Main(object):
 
 
 if __name__ == '__main__':
+    from utils.scheduler import A, MyReduceLROnPlateau
+    from utils.visualize import PlotVisdom
+    import numpy as np
+    import torch
     main = Main(network=CONFIG.MODEL)
     main.run()

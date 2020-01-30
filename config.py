@@ -5,6 +5,11 @@ class CONFIG(object):
     """
         to config the project
     """
+
+    MODEL = "unet"
+    # MODEL = "deeplabv3p_resnet"
+    # MODEL = "deeplabv3p_mobilenet"
+
     """network config"""
     NUM_CLASSES = 8
 
@@ -14,20 +19,14 @@ class CONFIG(object):
         CUDA_AVAIL = torch.cuda.is_available()
     else:
         CUDA_AVAIL = False
-    CUDA_DEVICE = 3
+    CUDA_DEVICE = 2
 
     SAVE_PATH = "logs"
-    # CHECKPOINT_FILE = "unet_weight.pt"
-    # CHECKPOINT_FILE = "deeplabv3p_resnet50_weight.pt"
-    CHECKPOINT_FILE = "deeplabv3p_mobilenet_weight.pt"
-    # LOGGING_FILE = "unet_logs.csv"
-    # LOGGING_FILE = "deeplabv3p_resnet50_logs.csv"
-    LOGGING_FILE = "deeplabv3p_mobilenet_logs.csv"
+    CHECKPOINT_FILE = MODEL + "_weight.pt"
+    LOGGING_FILE = MODEL + "_logs.csv"
 
     """train config"""
-    # MODEL = "unet"
-    # MODEL = "deeplabv3p_resnet"
-    MODEL = "deeplabv3p_mobilenet"
+
     EPOCHS = 200
     BATCH_SIZE = 4
     # IMG_SIZE = [1024, 384]
@@ -47,3 +46,10 @@ class CONFIG(object):
     GROUPS_FOR_NORM = 32
     SHORTCUT_DIM = 48
     SHORTCUT_KERNEL = 1
+
+    """visualize config"""
+    PORT = 8888
+    ENV = MODEL
+
+    """lr scheduler config"""
+    CosineT_max = 10
