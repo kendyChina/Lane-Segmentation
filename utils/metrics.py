@@ -1,55 +1,73 @@
-import torch
-import torch.nn.functional as F
 import numpy as np
 from config import CONFIG
 
-# MIoU: Mean Intersection over Union
-class MeanIoU(object):
-    def getConfusionMatrix(self):
-        # print(pred)
-        # print(label)
-        # Return True and False
-        mask = (self.label >= 0) & (self.label < self.num_classes)
-        # print(mask)
-        # print(label[mask])
-        # print(pred[mask])
-        label = self.num_classes * self.label[mask] + self.pred[mask]
-        # print(label)
-        count = np.bincount(label, minlength=self.num_classes ** 2)
-        # print(count)
-        confusionMatrix = count.reshape(self.num_classes, self.num_classes)
-        # print(confusionMatrix)
-        self.confusionMatrix = confusionMatrix
 
-    def meanIntersectionOverUnion(self):
-        # IoU = TP / (TP + FP + FN) = intersection / union
-        intersection = np.diag(self.confusionMatrix) # 取对角线值，返回list
-        # print(intersection)
-        union = np.sum(self.confusionMatrix, axis=1) + np.sum(self.confusionMatrix, axis=0)
-        # print(union)
-        IoU = []
-        for i, val in enumerate(intersection):
-            if union[i] != 0:
-                IoU.append(intersection[i] / union[i])
-            else:
-                IoU.append(1.0)
-        # print(IoU)
-        mIoU = np.nanmean(IoU) # Compute the mean of each IoU
-        # print(mIoU)
-        return mIoU
+def fast_hist(a, b, n):
+    """
+    Return a histogram that is a confusion metrix of a and b
+    :param a: np.ndarray with shape (HxW,)
+    :param b: np.ndarray with shape (HxW,)
+    :param n: num of classes
+    :return: np.ndarray with shape (n, n)
+    """
+    k = (a >= 0) & (a < n)
+    return np.bincount(n * a[k].astype(int) + b[k], minlength=n ** 2).reshape(n, n)
+
+
+def per_class_iu(hist):
+    """
+    Calculate the IoU(Intersection over Union) for each class
+    :param hist: np.ndarray with shape (n, n)
+    :return: np.ndarray with shape (n,)
+    """
+    np.seterr(divide="ignore", invalid="ignore")
+    res = np.diag(hist) / (hist.sum(1) + hist.sum(0) - np.diag(hist))
+    np.seterr(divide="warn", invalid="warn")
+    res[np.isnan(res)] = 0.
+    return res
+
+
+class ComputeIoU(object):
+    """
+    IoU: Intersection over Union
+    """
+
+    def __init__(self):
+        self.cfsmatrix = np.zeros((CONFIG.NUM_CLASSES, CONFIG.NUM_CLASSES), dtype="uint64")  # confusion matrix
+        self.ious = dict()
+
+    def get_cfsmatrix(self):
+        return self.cfsmatrix
+
+    def get_ious(self):
+        self.ious = dict(zip(range(CONFIG.NUM_CLASSES), per_class_iu(self.cfsmatrix)))  # {0: iou, 1: iou, ...}
+        return self.ious
+
+    def get_miou(self, ignore=None):
+        self.get_ious()
+        total_iou = 0
+        count = 0
+        for key, value in self.ious.items():
+            if isinstance(ignore, list) and key in ignore or \
+                    isinstance(ignore, int) and key == ignore:
+                continue
+            total_iou += value
+            count += 1
+        return total_iou / count
 
     def __call__(self, pred, label):
-        self.num_classes = CONFIG.NUM_CLASSES
-        pred = pred.cpu()
-        label = label.cpu()
-        pred = torch.argmax(F.softmax(pred, dim=1), dim=1)
-        # print(pred.shape)
-        # print(label.shape)
-        assert pred.shape[-2:] == label.shape[-2:]
-        self.pred = pred
-        self.label = label
-        self.getConfusionMatrix()
-        return self.meanIntersectionOverUnion()
+        """
+        :param pred: [N, H, W]
+        :param label:  [N, H, W}
+        Channel == 1
+        """
+
+        pred = pred.cpu().numpy()
+        label = label.cpu().numpy()
+
+        assert pred.shape == label.shape
+
+        self.cfsmatrix += fast_hist(pred.reshape(-1), label.reshape(-1), CONFIG.NUM_CLASSES).astype("uint64")
 
 
 def compute_iou(pred, label, iou):

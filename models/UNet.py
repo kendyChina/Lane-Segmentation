@@ -4,16 +4,16 @@ import torch.nn.functional as F
 from torchsummary import summary
 
 class UNetConvBlock(nn.Module):
-    def __init__(self, in_chnl, out_chnl, padding, batch_norm):
+    def __init__(self, in_chnl, out_chnl, padding, batch_norm, bias):
         super(UNetConvBlock, self).__init__()
         block = []
 
-        block.append(nn.Conv2d(in_chnl, out_chnl, kernel_size=3, padding=padding))
+        block.append(nn.Conv2d(in_chnl, out_chnl, kernel_size=3, padding=padding, bias=bias))
         if batch_norm:
             block.append(nn.BatchNorm2d(out_chnl))
         block.append(nn.ReLU(inplace=True))
 
-        block.append(nn.Conv2d(out_chnl, out_chnl, kernel_size=3, padding=padding))
+        block.append(nn.Conv2d(out_chnl, out_chnl, kernel_size=3, padding=padding, bias=bias))
         if batch_norm:
             block.append(nn.BatchNorm2d(out_chnl))
         block.append(nn.ReLU(inplace=True))
@@ -25,7 +25,7 @@ class UNetConvBlock(nn.Module):
         return x
 
 class UNetUpBlock(nn.Module):
-    def __init__(self, in_chnl, out_chnl, up_mode, padding, batch_norm):
+    def __init__(self, in_chnl, out_chnl, up_mode, padding, batch_norm, bias):
         super(UNetUpBlock, self).__init__()
         if up_mode == "upconv":
             self.up = nn.ConvTranspose2d(in_chnl, out_chnl, kernel_size=2, stride=2)
@@ -36,7 +36,7 @@ class UNetUpBlock(nn.Module):
             )
 
         self.conv_block = UNetConvBlock(in_chnl, out_chnl, padding=padding,
-                                        batch_norm=batch_norm)
+                                        batch_norm=batch_norm, bias=bias)
 
     def center_crop(self, layer, target_size):
         _, _, layer_h, layer_w = layer.size()
@@ -54,8 +54,8 @@ class UNetUpBlock(nn.Module):
         return x
 
 class UNet(nn.Module):
-    def __init__(self, in_chnl=3, base_chnl=64, n_classes=8, depth=5,
-                 padding=1, batch_norm=False, up_mode="upconv", **kwargs):
+    def __init__(self, in_chnl=3, base_chnl=32, n_classes=8, depth=5,
+                 padding=1, batch_norm=False, bias=True, up_mode="upconv", **kwargs):
         super(UNet, self).__init__()
         assert up_mode in ("upconv", "upsample")
         self.depth = depth
@@ -66,14 +66,14 @@ class UNet(nn.Module):
             out_chnl *= 2
             # To keep i' == i    padding = (kernel_size - 1) //2
             self.down_path.append(UNetConvBlock(in_chnl, out_chnl,
-                                                padding=padding, batch_norm=batch_norm))
+                                                padding=padding, batch_norm=batch_norm, bias=bias))
             in_chnl = out_chnl
 
         self.up_path = nn.ModuleList()
         for _ in range(depth - 1):
             in_chnl //= 2
             self.up_path.append(UNetUpBlock(out_chnl, in_chnl, up_mode,
-                                            padding, batch_norm))
+                                            padding, batch_norm, bias=bias))
             out_chnl = in_chnl
         self.last = nn.Conv2d(in_chnl, n_classes, kernel_size=1)
 
@@ -106,9 +106,9 @@ if __name__ == '__main__':
     # x = Image.open(r"E:\code\cv\baidu_data_set\baidu_Image_Data\Road02\ColorImage_road02\ColorImage\Record001\Camera 5\170927_063811892_Camera_5.jpg")
     # x = transforms.ToTensor()(x)
 
-    model = UNet()
+    model = UNet(batch_norm=True, bias=False)
     model.eval()
-    summary(model, (3, 1024, 384))
+    summary(model, (3, 256, 96))
     # y = model(x)
     # print(x.shape)
     # print(y.shape)

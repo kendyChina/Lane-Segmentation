@@ -12,6 +12,7 @@ class CONFIG(object):
 
     """network config"""
     NUM_CLASSES = 8
+    IGNORE = 0
 
     """device config"""
     USE_CUDA = True
@@ -19,14 +20,13 @@ class CONFIG(object):
         CUDA_AVAIL = torch.cuda.is_available()
     else:
         CUDA_AVAIL = False
-    CUDA_DEVICE = 2
+    CUDA_DEVICE = 4
 
     SAVE_PATH = "logs"
     CHECKPOINT_FILE = MODEL + "_weight.pt"
     LOGGING_FILE = MODEL + "_logs.csv"
 
     """train config"""
-
     EPOCHS = 200
     BATCH_SIZE = 4
     # IMG_SIZE = [1024, 384]
@@ -49,7 +49,7 @@ class CONFIG(object):
 
     """visualize config"""
     PORT = 8888
-    ENV = MODEL
+    ENV = MODEL + "_base"
 
     """lr scheduler config"""
     CosineT_max = 10
