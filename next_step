@@ -1,0 +1,4 @@
+1. build UNet-MixNet
+2. remove resize from predict.py
+3. save the probability. Compare the true pixels and the false pixels probability.
+4. analyze data. look at each class in how many picture. And the distribution of pixel in all data.

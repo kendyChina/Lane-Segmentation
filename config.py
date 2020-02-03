@@ -6,7 +6,8 @@ class CONFIG(object):
         to config the project
     """
 
-    MODEL = "unet"
+    # MODEL = "unet_base"
+    MODEL = "unet_mixnet"
     # MODEL = "deeplabv3p_resnet"
     # MODEL = "deeplabv3p_mobilenet"
 
@@ -29,8 +30,8 @@ class CONFIG(object):
     """train config"""
     EPOCHS = 200
     BATCH_SIZE = 4
-    # IMG_SIZE = [1024, 384]
-    IMG_SIZE = [256, 96]
+    IMG_SIZE = [1024, 384]
+    # IMG_SIZE = [256, 96]
     # IMG_SIZE = [64, 24]
     MIN_LOSS = np.Inf
     # MIN_LOSS = 0.039740
@@ -49,7 +50,7 @@ class CONFIG(object):
 
     """visualize config"""
     PORT = 8888
-    ENV = MODEL + "_base"
+    ENV = MODEL + ""
 
     """lr scheduler config"""
     CosineT_max = 10

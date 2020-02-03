@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 from config import CONFIG
 from models.UNet import UNet
+from models.UNet_MixNet import MixNetUNet
 from models.deeplabv3p_resnet import RESNETDeeplabV3Plus
 from models.deeplabv3p_mobilenet import MobileNetDeeplabV3Plus
 from utils.data_feeder import train_loader, val_loader
@@ -67,8 +68,10 @@ class Main(object):
 
     def __init__(self, network="UNet"):
         network = network.lower()
-        if "unet" in network:
+        if "unet_base" in network:
             self.model = UNet(batch_norm=True, bias=False)
+        elif "unet_mixnet" in network:
+            self.model = MixNetUNet(batch_norm=True, bias=False)
         elif "deeplabv3p_resnet" in network:
             self.model = RESNETDeeplabV3Plus(pretrained=CONFIG.PRETRAIN)
         elif "deeplabv3p_mobilenet" in network:
@@ -159,6 +162,7 @@ class Main(object):
             pred = self.model(image)
             mask_loss = self.calc_loss(pred, label)
             total_mask_loss += mask_loss.detach().item()
+            torch.max(F.softmax(pred, dim=1), dim=1)
             pred = torch.argmax(F.softmax(pred, dim=1), dim=1)
             compute_iou(pred, label)
             # iou = compute_iou(pred, label, iou)

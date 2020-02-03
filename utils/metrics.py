@@ -4,7 +4,7 @@ from config import CONFIG
 
 def fast_hist(a, b, n):
     """
-    Return a histogram that is a confusion metrix of a and b
+    Return a histogram that's the confusion matrix of a and b
     :param a: np.ndarray with shape (HxW,)
     :param b: np.ndarray with shape (HxW,)
     :param n: num of classes
