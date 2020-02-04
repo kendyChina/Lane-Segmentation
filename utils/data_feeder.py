@@ -29,5 +29,5 @@ train_loader = DataLoader(train_dataset, batch_size=CONFIG.BATCH_SIZE,
 val_loader = DataLoader(val_dataset, batch_size=CONFIG.BATCH_SIZE,
                         shuffle=False, drop_last=False, **kwargs)
 
-test_loader = DataLoader(test_dataset, batch_size=CONFIG.BATCH_SIZE,
-                        shuffle=False, drop_last=False, **kwargs)
+test_loader = DataLoader(test_dataset, batch_size=1,
+                        shuffle=True, drop_last=False, **kwargs)

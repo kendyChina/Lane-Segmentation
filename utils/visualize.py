@@ -29,5 +29,22 @@ class PlotVisdom(object):
         )
 
 
+class PlotImage(object):
+    def __init__(self, win, env):
+        self.vis = visdom.Visdom(port=CONFIG.PORT, env=env)
+        self.win = win
+
+    def __call__(self, img,  *args, **kwargs):
+        img = np.array(img)
+        if len(img.shape) == 3:
+            img = img.transpose((2, 0, 1))  # (H, W, C) --> (C, H, W)
+        elif len(img.shape) == 2:
+            img = img[3, :]  # (H, W) --> (C, H, W)
+        self.vis.image(img, win=self.win, opts=dict(title=self.win))
+
+
 if __name__ == '__main__':
-    plot_loss = PlotVisdom("loss", [1])
+    plot_img = PlotImage("test1", "test-img")
+    import torch
+    x = torch.randn((3, 256, 96))
+    plot_img(x)
