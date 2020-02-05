@@ -35,16 +35,29 @@ class PlotImage(object):
         self.win = win
 
     def __call__(self, img,  *args, **kwargs):
-        img = np.array(img)
-        if len(img.shape) == 3:
-            img = img.transpose((2, 0, 1))  # (H, W, C) --> (C, H, W)
-        elif len(img.shape) == 2:
-            img = img[3, :]  # (H, W) --> (C, H, W)
-        self.vis.image(img, win=self.win, opts=dict(title=self.win))
+        self.vis.image(np.array(img).transpose((2, 0, 1)),  # (H, W, C) --> (C, H, W)
+                       win=self.win, opts=dict(caption=self.win, title=self.win))
+
+
+class PlotHeatmap(object):
+    def __init__(self, win, env, **opts):
+        self.vis = visdom.Visdom(port=CONFIG.PORT, env=env)
+        self.win = win
+        self.opts = opts
+    def __call__(self, hm, *args, **kwargs):
+        hm = np.flipud(hm)
+        self.vis.heatmap(hm, opts=self.opts)
 
 
 if __name__ == '__main__':
-    plot_img = PlotImage("test1", "test-img")
+    plot = PlotHeatmap("test", "test-env", rownames=[i for i in range(8)], columnnames=[i for i in range(8)],
+                       xmin=0,colormap="b")
     import torch
-    x = torch.randn((3, 256, 96))
-    plot_img(x)
+    from utils.metrics import ComputeIoU
+    a = torch.tensor([1,5,7,3,4])
+    b = torch.tensor([1,4,7,3,5])
+    compute = ComputeIoU()
+    compute(a, b)
+    cfs = compute.get_cfsmatrix()
+    plot(cfs)
+

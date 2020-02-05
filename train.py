@@ -12,9 +12,8 @@ from models.deeplabv3p_resnet import RESNETDeeplabV3Plus
 from models.deeplabv3p_mobilenet import MobileNetDeeplabV3Plus
 from utils.data_feeder import train_loader, val_loader
 from utils.earlystop import PaW, EarlyStopping
-from utils.metrics import compute_iou
 from utils.metrics import ComputeIoU
-from utils.visualize import PlotVisdom
+from utils.visualize import PlotVisdom, PlotHeatmap
 from utils.scheduler import MyReduceLROnPlateau
 
 
@@ -59,8 +58,8 @@ def get_loss_fn():
 
 def get_lr_scheduler(optimizer):
     # return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=CONFIG.CosineT_max, eta_min=2e-8)
-    return MyReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=7, verbose=False,
-                                                      threshold_mode="rel", threshold=1e-4, cooldown=0,
+    return MyReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=5, verbose=False,
+                                                      threshold_mode="rel", threshold=7e-3, cooldown=0,
                                                       min_lr=0, eps=1e-8)
 
 
@@ -100,6 +99,7 @@ class Main(object):
         self.plot_ious = PlotVisdom("iou", ["class{}".format(i) for i in range(CONFIG.NUM_CLASSES)])
 
         self.plot_lr = PlotVisdom("LearningRate", ["lr",])
+        self.plot_cfsmatrix = PlotHeatmap("ConfusionMatrix", CONFIG.ENV)
 
     def train_epoch(self):
         self.model.train()
@@ -162,7 +162,7 @@ class Main(object):
             pred = self.model(image)
             mask_loss = self.calc_loss(pred, label)
             total_mask_loss += mask_loss.detach().item()
-            torch.max(F.softmax(pred, dim=1), dim=1)
+
             pred = torch.argmax(F.softmax(pred, dim=1), dim=1)
             compute_iou(pred, label)
             # iou = compute_iou(pred, label, iou)
@@ -174,6 +174,7 @@ class Main(object):
             self.print_and_write(iou_string)
             self.val_ious[cls].append(iou)
         miou = compute_iou.get_miou(ignore=CONFIG.IGNORE)
+        self.plot_cfsmatrix(compute_iou.get_cfsmatrix())
 
         # total_iou = 0.0
         # for i in range(CONFIG.NUM_CLASSES):
@@ -234,8 +235,6 @@ class Main(object):
 
 
 if __name__ == '__main__':
-    from utils.scheduler import A, MyReduceLROnPlateau
-    from utils.visualize import PlotVisdom
     import numpy as np
     import torch
     main = Main(network=CONFIG.MODEL)
