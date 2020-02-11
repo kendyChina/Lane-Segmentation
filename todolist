@@ -2,5 +2,8 @@
 2. remove resize from predict.py
 3. save the probability. Compare the true pixels and the false pixels probability.
 4. analyze data. look at each class in how many picture. And the distribution of pixel in all data.
-5. 对比predict里缩小好还是不缩小好
+5. 对比predict里缩小好还是不缩小好（不缩小貌似不够内存）
 6. 把mixnet后面的downsample改成atrous conv
+7. try other loss
+8. 初始化
+9. loss

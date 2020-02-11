@@ -7,7 +7,7 @@ class CONFIG(object):
     """
 
     # MODEL = "unet_base"
-    MODEL = "unet_mixnet"
+    MODEL = "unet_mixnet-Cutouttest"
     # MODEL = "deeplabv3p_resnet"
     # MODEL = "deeplabv3p_mobilenet"
 
@@ -21,7 +21,7 @@ class CONFIG(object):
         CUDA_AVAIL = torch.cuda.is_available()
     else:
         CUDA_AVAIL = False
-    CUDA_DEVICE = 2
+    CUDA_DEVICE = 4
 
     SAVE_PATH = "logs"
     CHECKPOINT_FILE = MODEL + "_weight.pt"
@@ -30,6 +30,7 @@ class CONFIG(object):
     """train config"""
     EPOCHS = 200
     BATCH_SIZE = 4
+    # 分辨率尽量能被下采样倍数整除
     # IMG_SIZE = [3384, 1020]
     # IMG_SIZE = [1536, 512]
     IMG_SIZE = [1024, 384]

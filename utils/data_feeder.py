@@ -1,7 +1,7 @@
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
-from utils.image_process import LaneDataset, ImageAug, DeformAug, ToTensor
+from utils.image_process import LaneDataset, ImageAug, DeformAug, CutOut, ToTensor
 from config import CONFIG
 
 print("CUDA's availability: {}".format(CONFIG.CUDA_AVAIL))
@@ -14,8 +14,9 @@ test_dir = r"data_list/test.csv"
 # val_dir = r"../data_list/val.csv"
 # test_dir = r"../data_list/test.csv"
 
+# CutOut(32, 0.5)
 train_dataset = LaneDataset(train_dir, image_size=CONFIG.IMG_SIZE,
-                               offset=CONFIG.OFFSET, transform=transforms.Compose([ToTensor()]))
+                               offset=CONFIG.OFFSET, transform=transforms.Compose([CutOut(32, 0.5), ToTensor()]))
 val_dataset = LaneDataset(val_dir, image_size=CONFIG.IMG_SIZE,
                           offset=CONFIG.OFFSET, transform=transforms.Compose([ToTensor()]))
 test_dataset = LaneDataset(test_dir, image_size=CONFIG.IMG_SIZE,

@@ -92,10 +92,10 @@ class UNetConvBlock(nn.Module):
             block.append(nn.BatchNorm2d(out_chnl))
         block.append(nn.ReLU(inplace=True))
 
-        self.block = nn.Sequential(*block)
+        self.up_convs = nn.Sequential(*block)
 
     def forward(self, x):
-        x = self.block(x)
+        x = self.up_convs(x)
         return x
 
 
@@ -130,12 +130,11 @@ class UNetUpBlock(nn.Module):
 
 
 class MixNetUNet(nn.Module):
-    def __init__(self, in_chnl=3, base_chnl=32, n_classes=8, depth=5,
-                 padding=1, batch_norm=True, bias=False, up_mode="upconv", **kwargs):
+    def __init__(self, n_classes=8, padding=1, batch_norm=True,
+                 bias=False, up_mode="upconv", **kwargs):
         super(MixNetUNet, self).__init__()
         assert up_mode in ("upconv", "upsample")
         self.backbone = MixNet()
-        self.depth = depth
 
         chnls = [24, 32, 40, 120, 200]
 

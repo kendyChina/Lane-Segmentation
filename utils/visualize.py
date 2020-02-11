@@ -1,6 +1,7 @@
 import visdom
 import numpy as np
 from config import CONFIG
+import matplotlib.pyplot as plt
 
 
 class PlotVisdom(object):
@@ -46,12 +47,40 @@ class PlotHeatmap(object):
         self.opts = opts
     def __call__(self, hm, *args, **kwargs):
         hm = np.flipud(hm)
-        self.vis.heatmap(hm, opts=self.opts)
+        self.vis.heatmap(hm, win=self.win, opts=self.opts)
+
+
+class PlotCfsMatrix(object):
+    def __init__(self, win, env):
+        self.vis = visdom.Visdom(port=CONFIG.PORT, env=env)
+        self.win = win
+    def __call__(self, cfsMatrix_, *args, **kwargs):
+        # normalize
+        cfsMatrix = np.float64(cfsMatrix_.copy())
+        for i in range(CONFIG.NUM_CLASSES):
+            divisor = cfsMatrix_[:, i].sum()  # 除数
+            if divisor != 0:
+                cfsMatrix[:, i] = cfsMatrix_[:, i] / divisor
+
+        ticks = np.array(range(CONFIG.NUM_CLASSES))
+        plt.xticks(ticks, ticks)
+        plt.yticks(ticks, ticks)
+        plt.xlabel("Predict label")
+        plt.ylabel("True label")
+        plt.title("Confusion_Matrix")
+
+        cmap = plt.cm.get_cmap('Greys')
+        plt.imshow(cfsMatrix, cmap=cmap)
+        plt.colorbar()
+
+        for i in range(CONFIG.NUM_CLASSES):
+            for j in range(CONFIG.NUM_CLASSES):
+                plt.text(x=j, y=i, s=int(cfsMatrix[i][j]),
+                         va="center", ha="center", fontsize=10, color="red")
+        self.vis.matplot(plt, win=self.win)
 
 
 if __name__ == '__main__':
-    plot = PlotHeatmap("test", "test-env", rownames=[i for i in range(8)], columnnames=[i for i in range(8)],
-                       xmin=0,colormap="b")
     import torch
     from utils.metrics import ComputeIoU
     a = torch.tensor([1,5,7,3,4])
@@ -59,5 +88,6 @@ if __name__ == '__main__':
     compute = ComputeIoU()
     compute(a, b)
     cfs = compute.get_cfsmatrix()
+    plot = PlotCfsMatrix(win="testwin", env="test")
     plot(cfs)
 

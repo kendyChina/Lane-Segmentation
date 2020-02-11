@@ -13,7 +13,7 @@ from models.deeplabv3p_mobilenet import MobileNetDeeplabV3Plus
 from utils.data_feeder import train_loader, val_loader
 from utils.earlystop import PaW, EarlyStopping
 from utils.metrics import ComputeIoU
-from utils.visualize import PlotVisdom, PlotHeatmap
+from utils.visualize import PlotVisdom, PlotCfsMatrix
 from utils.scheduler import MyReduceLROnPlateau
 
 
@@ -58,8 +58,8 @@ def get_loss_fn():
 
 def get_lr_scheduler(optimizer):
     # return torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=CONFIG.CosineT_max, eta_min=2e-8)
-    return MyReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=5, verbose=False,
-                                                      threshold_mode="rel", threshold=7e-3, cooldown=0,
+    return MyReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=2, verbose=False,
+                                                      threshold_mode="rel", threshold=1e-3, cooldown=0,
                                                       min_lr=0, eps=1e-8)
 
 
@@ -99,7 +99,7 @@ class Main(object):
         self.plot_ious = PlotVisdom("iou", ["class{}".format(i) for i in range(CONFIG.NUM_CLASSES)])
 
         self.plot_lr = PlotVisdom("LearningRate", ["lr",])
-        self.plot_cfsmatrix = PlotHeatmap("ConfusionMatrix", CONFIG.ENV)
+        self.plot_cfsmatrix = PlotCfsMatrix("ConfusionMatrix", CONFIG.ENV)
 
     def train_epoch(self):
         self.model.train()
@@ -107,8 +107,6 @@ class Main(object):
         total_mask_loss = 0.0
         dataprocess = tqdm(train_loader)
         dataprocess.set_description_str("epoch:{}".format(self.epoch))
-        # iou = {"TP": {i: 0 for i in range(CONFIG.NUM_CLASSES)},
-        #        "TA": {i: 0 for i in range(CONFIG.NUM_CLASSES)}}
         for batch_idx, batch_item in enumerate(dataprocess):
             image, label = batch_item["image"], batch_item["label"]
             if CONFIG.CUDA_AVAIL:
@@ -121,7 +119,6 @@ class Main(object):
             self.optimizer.step()
             pred = torch.argmax(F.softmax(pred, dim=1), dim=1)
             compute_iou(pred, label)
-            # iou = compute_iou(pred, label, iou)
             dataprocess.set_postfix_str("mask_loss:{:.4f}".format(total_mask_loss/ (batch_idx + 1)))
 
         ious = compute_iou.get_ious()
@@ -129,14 +126,6 @@ class Main(object):
             iou_string = "Class{}'s iou: {:.4f}".format(cls, iou)
             self.print_and_write(iou_string)
         miou = compute_iou.get_miou(ignore=CONFIG.IGNORE)
-        # total_iou = 0.0
-        # for i in range(CONFIG.NUM_CLASSES):
-        #     iou_i = iou["TP"][i] / iou["TA"][i]
-        #     iou_string = "Class{}'s iou: {:.4f}".format(i, iou_i)
-        #     self.print_and_write(iou_string)
-        #     if i > 0:  # ignore class 0
-        #         total_iou += iou_i
-        # miou = total_iou / (CONFIG.NUM_CLASSES - 1)
         self.train_miou.append(miou)
         self.print_and_write("MIoU is: {:.4f} (without class 0)".format(miou))
 
@@ -147,68 +136,72 @@ class Main(object):
         self.trainingF.flush()
 
     def valid_epoch(self):
-        self.model.eval()
-        compute_iou = ComputeIoU()
-        total_mask_loss = 0.0
-        dataprocess = tqdm(val_loader)
-        dataprocess.set_description_str("epoch:{}".format(self.epoch))
-        # iou is for sum TP and TA of each class
-        # iou = {"TP": {i: 0 for i in range(CONFIG.NUM_CLASSES)},
-        #        "TA": {i: 0 for i in range(CONFIG.NUM_CLASSES)}}
-        for batch_idx, batch_item in enumerate(dataprocess):
-            image, label = batch_item["image"], batch_item["label"]
-            if CONFIG.CUDA_AVAIL:
-                image, label = image.cuda(), label.cuda()
-            pred = self.model(image)
-            mask_loss = self.calc_loss(pred, label)
-            total_mask_loss += mask_loss.detach().item()
+        with torch.no_grad():
+            self.model.eval()
+            compute_iou = ComputeIoU()
+            total_mask_loss = 0.0
+            dataprocess = tqdm(val_loader)
+            dataprocess.set_description_str("epoch:{}".format(self.epoch))
 
-            pred = torch.argmax(F.softmax(pred, dim=1), dim=1)
-            compute_iou(pred, label)
-            # iou = compute_iou(pred, label, iou)
-            dataprocess.set_postfix_str("mask_loss:{:.4f}".format(total_mask_loss / (batch_idx + 1)))
 
-        ious = compute_iou.get_ious()
-        for cls, iou in ious.items():
-            iou_string = "Class{}'s iou: {:.4f}".format(cls, iou)
-            self.print_and_write(iou_string)
-            self.val_ious[cls].append(iou)
-        miou = compute_iou.get_miou(ignore=CONFIG.IGNORE)
-        self.plot_cfsmatrix(compute_iou.get_cfsmatrix())
+            for batch_idx, batch_item in enumerate(dataprocess):
+                image, label = batch_item["image"], batch_item["label"]
+                if CONFIG.CUDA_AVAIL:
+                    image, label = image.cuda(), label.cuda()
+                pred = self.model(image)
+                mask_loss = self.calc_loss(pred, label)
+                total_mask_loss += mask_loss.detach().item()
 
-        # total_iou = 0.0
-        # for i in range(CONFIG.NUM_CLASSES):
-        #     iou_i = iou["TP"][i] / iou["TA"][i]
-        #     iou_string = "Class{}'s iou: {:.4f}".format(i, iou_i)
-        #     self.print_and_write(iou_string)
-        #     self.val_ious[i].append(iou_i)
-        #     if i > 0: # ignore class 0
-        #         total_iou += iou_i
-        # miou = total_iou / (CONFIG.NUM_CLASSES - 1)
-        self.valid_miou.append(miou)
-        self.print_and_write("MIoU is: {:.4f} (without class 0)".format(miou))
+                pred = torch.argmax(F.softmax(pred, dim=1), dim=1)
+                compute_iou(pred, label)
+                dataprocess.set_postfix_str("mask_loss:{:.4f}".format(total_mask_loss / (batch_idx + 1)))
 
-        avg_loss = total_mask_loss / len(val_loader)
-        self.valid_losses.append(avg_loss)
-        self.print_and_write("mask loss is {:.4f}".format(avg_loss))
+            ious = compute_iou.get_ious()
+            for cls, iou in ious.items():
+                iou_string = "Class{}'s iou: {:.4f}".format(cls, iou)
+                self.print_and_write(iou_string)
+                self.val_ious[cls].append(iou)
+            miou = compute_iou.get_miou(ignore=CONFIG.IGNORE)
+            self.plot_cfsmatrix(compute_iou.get_cfsmatrix())
+            self.valid_miou.append(miou)
+            self.print_and_write("MIoU is: {:.4f} (without class 0)".format(miou))
 
-        # self.earlystop(avg_loss, self.model)
-        self.trainingF.flush()
+            avg_loss = total_mask_loss / len(val_loader)
+            self.valid_losses.append(avg_loss)
+            self.print_and_write("mask loss is {:.4f}".format(avg_loss))
+
+            # self.earlystop(avg_loss, self.model)
+            self.trainingF.flush()
 
     def run(self):
         checkpoint_path = os.path.join(CONFIG.SAVE_PATH, CONFIG.CHECKPOINT_FILE)
         if os.path.exists(checkpoint_path):
-            self.model.load_state_dict(torch.load(checkpoint_path))
+            checkpoint = torch.load(checkpoint_path)
+            if "state_dict" in checkpoint:
+                self.model.load_state_dict(checkpoint["state_dict"])
+                resume_epoch = checkpoint["epoch"] + 1
+                self.optimizer = checkpoint["optimizer"]
+                scheduler = checkpoint["scheduler"]
+                self.train_losses = checkpoint["train_losses"]
+                self.valid_losses = checkpoint["valid_losses"]
+                self.train_miou = checkpoint["train_miou"]
+                self.valid_miou = checkpoint["valid_miou"]
+                self.val_ious = checkpoint["val_ious"]
+                lr_list = checkpoint["lr_list"]
+            else:
+                self.model.load_state_dict(checkpoint)
+                resume_epoch = 0
+                lr_list = []
+                scheduler = get_lr_scheduler(self.optimizer)
             self.print_and_write("load checkpoint succeed")
-        # else:
-            # self.model.apply(weights_init)  # init
-            # self.print_and_write("init weights succeed")
+        else:
+            resume_epoch = 0
+            lr_list = []
+            scheduler = get_lr_scheduler(self.optimizer)
         self.print_and_write("Parameters:\n"
                              "\tBatch size: {}\n"
                              "\tImage size: {}\n".format(CONFIG.BATCH_SIZE, CONFIG.IMG_SIZE, CONFIG.BASE_LR))
-        lr_list = []
-        scheduler = get_lr_scheduler(self.optimizer)
-        for epoch in range(0, CONFIG.EPOCHS + 0):
+        for epoch in range(resume_epoch, CONFIG.EPOCHS + resume_epoch):
             self.print_and_write("********** EPOCH {} **********".format(epoch))
             lr = scheduler.get_lr()[0]
             # lr = adjust_lr(self.optimizer, epoch)
@@ -225,7 +218,17 @@ class Main(object):
             self.plot_ious(*self.val_ious)
             self.plot_lr(lr_list)
 
-            torch.save(self.model.state_dict(), os.path.join(CONFIG.SAVE_PATH, CONFIG.CHECKPOINT_FILE))
+            state = {"epoch": epoch,
+                     "state_dict": self.model.state_dict(),
+                     "optimizer": self.optimizer.state_dict(),
+                     "scheduler": scheduler.state_dict(),
+                     "train_losses": self.train_losses,
+                     "valid_losses": self.valid_losses,
+                     "train_miou": self.train_miou,
+                     "valid_miou": self.valid_miou,
+                     "val_ious": self.val_ious,
+                     "lr_list": lr_list}
+            torch.save(state, os.path.join(CONFIG.SAVE_PATH, CONFIG.CHECKPOINT_FILE))
 
             # if self.earlystop.early_stop:
             #     self.print_and_write("Early stopping")
